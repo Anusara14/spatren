@@ -1,14 +1,19 @@
 import { liveQuery } from 'dexie'
-import { useEffect, useState } from 'react'
-import { db } from '../lib/db'
-import { flatQuestions, type FormDef } from '../lib/forms'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { db, type LocalRecord } from '../lib/db'
+import { flatQuestions } from '../lib/forms'
+import { clock } from '../lib/geo'
 import { supabase } from '../lib/supabase'
-import { useOutbox } from '../lib/sync'
+import { syncNow, useOnline } from '../lib/sync'
 import Capture from './Capture'
+import FormImport, { localForms, removeLocalForm } from './FormImport'
 import FormRunner, { type FormRow } from './FormRunner'
-import { IconChevrons, IconPlus } from './icons'
+import { IconBack, IconCheckCircle, IconChevrons, IconDownload, IconFilePlus, IconNote, IconPencil, IconTrash, IconUpload } from './icons'
+import { Mark, ThemeToggle } from './Theme'
 
 const FORMS_CACHE = 'spatren.forms'
+const draftKey = (id: string) => `spatren.draft.${id}`
+type View = 'home' | 'start' | 'drafts' | 'ready' | 'sent' | 'import' | 'quick'
 
 function cachedForms(): FormRow[] {
   try {
@@ -18,16 +23,24 @@ function cachedForms(): FormRow[] {
   }
 }
 
-export default function Collect() {
-  const [forms, setForms] = useState<FormRow[]>(cachedForms)
+function hasDraft(id: string): boolean {
+  const d = localStorage.getItem(draftKey(id))
+  return !!d && d !== '{}'
+}
+
+// KoboCollect-style hub: Start new form · Drafts · Ready to send · Sent · Import form · Quick note.
+export default function Collect({ isAdmin }: { isAdmin: boolean }) {
+  const [view, setView] = useState<View>('home')
+  const [published, setPublished] = useState<FormRow[]>(cachedForms)
+  const [local, setLocal] = useState<FormRow[]>(localForms)
   const [open, setOpen] = useState<FormRow | null>(null)
-  const [quick, setQuick] = useState(false)
-  const [mine, setMine] = useState<Record<string, number>>({})
+  const [records, setRecords] = useState<LocalRecord[]>([])
   const [toast, setToast] = useState<string | null>(null)
-  const outbox = useOutbox()
+  const [sending, setSending] = useState(false)
+  const online = useOnline()
 
   useEffect(() => {
-    // Forms are cached so surveys can be started with no signal.
+    // Published forms are cached so surveys start with no signal.
     const load = () =>
       void supabase
         .from('forms')
@@ -36,7 +49,7 @@ export default function Collect() {
         .order('created_at', { ascending: false })
         .then(({ data }) => {
           if (!data) return
-          setForms(data as FormRow[])
+          setPublished(data as FormRow[])
           localStorage.setItem(FORMS_CACHE, JSON.stringify(data))
         })
     load()
@@ -45,21 +58,28 @@ export default function Collect() {
   }, [])
 
   useEffect(() => {
-    const sub = liveQuery(() => db.records.toArray()).subscribe({
-      next: (rs) => {
-        const c: Record<string, number> = {}
-        for (const r of rs) if (r.kind === 'survey') c[String(r.data.form_id)] = (c[String(r.data.form_id)] ?? 0) + 1
-        setMine(c)
-      },
-    })
+    const sub = liveQuery(() => db.records.orderBy('recorded_at').reverse().toArray()).subscribe({ next: setRecords })
     return () => sub.unsubscribe()
   }, [])
 
   useEffect(() => {
     if (!toast) return
-    const id = setTimeout(() => setToast(null), 2800)
+    const id = setTimeout(() => setToast(null), 3000)
     return () => clearTimeout(id)
   }, [toast])
+
+  const forms = useMemo(() => [...published, ...local], [published, local])
+  const drafts = forms.filter((f) => hasDraft(f.id))
+  const ready = records.filter((r) => !r.synced)
+  const sent = records.filter((r) => r.synced)
+  const formTitle = (r: LocalRecord) => (r.kind === 'survey' ? String(r.data.form_title ?? 'Survey') : r.kind[0].toUpperCase() + r.kind.slice(1))
+
+  async function sendAll() {
+    setSending(true)
+    const res = await syncNow()
+    setSending(false)
+    setToast(res.ok ? 'All sent.' : `Not sent: ${res.error ?? 'try again'}`)
+  }
 
   if (open)
     return (
@@ -67,54 +87,165 @@ export default function Collect() {
         form={open}
         onClose={(saved) => {
           setOpen(null)
-          if (saved) setToast(navigator.onLine ? 'Response saved. Uploading…' : 'Response saved on this phone. It uploads when you are online.')
+          if (saved) setToast(online ? 'Finalised. Sending…' : 'Finalised and saved on this phone. It sends when you are online.')
         }}
       />
     )
-  if (quick) return <Capture onBack={() => setQuick(false)} />
+  if (view === 'quick') return <Capture onBack={() => setView('home')} />
+
+  const back = (title: string, extra?: ReactNode) => (
+    <header className="kc-sub">
+      <button className="glass-btn sm" aria-label="Back to Collect" onClick={() => setView('home')}><IconBack /></button>
+      <h1 className="grow">{title}</h1>
+      {extra}
+    </header>
+  )
 
   return (
-    <div className="stack" style={{ gap: 18 }}>
+    <div className="stack" style={{ gap: 16 }}>
       {toast && <div className="toast">{toast}</div>}
-      <header className="row between">
-        <h1 className="page-title">Collect</h1>
-        {outbox.records > 0 && <span className="chip">{outbox.records} waiting to upload</span>}
-      </header>
 
-      <section className="stack" style={{ gap: 10 }}>
-        <h2 className="section-title">Surveys</h2>
-        {forms.length === 0 && (
-          <p className="empty">No surveys yet. Your coordinator publishes them from Admin → Forms, and they appear here automatically.</p>
-        )}
-        {forms.map((f) => {
-          const n = flatQuestions(f.definition as FormDef).length
-          const draft = localStorage.getItem(`spatren.draft.${f.id}`)
-          const hasDraft = !!draft && draft !== '{}'
-          return (
-            <button key={f.id} className="form-card" onClick={() => setOpen(f)}>
-              <div className="grow">
+      {view === 'home' && (
+        <>
+          <header className="kc-head">
+            <Mark size={44} />
+            <div className="grow">
+              <h1>SPATREN Collect</h1>
+              <p>L2S4 · Anuradhapura field visit</p>
+            </div>
+            <span className={`chip ${online ? 'chip-lime' : ''}`}><span className={`dot ${online ? 'live' : 'offline'}`} />{online ? 'Online' : 'Offline'}</span>
+          </header>
+
+          <nav className="kc-menu" aria-label="Collect">
+            <MenuItem icon={<IconFilePlus />} title="Start new form" sub={`${forms.length} form${forms.length === 1 ? '' : 's'} available`} onClick={() => setView('start')} accent />
+            <MenuItem icon={<IconPencil />} title="Drafts" sub="Continue unfinished forms" count={drafts.length} onClick={() => setView('drafts')} />
+            <MenuItem icon={<IconUpload />} title="Ready to send" sub={ready.length ? 'Finalised, waiting to upload' : 'Nothing waiting'} count={ready.length} warn={ready.length > 0} onClick={() => setView('ready')} />
+            <MenuItem icon={<IconCheckCircle />} title="Sent" sub="Uploaded from this phone" count={sent.length} onClick={() => setView('sent')} />
+            <MenuItem icon={<IconDownload />} title="Import form" sub="From ChatGPT, Gemini, Claude or a .json file" onClick={() => setView('import')} />
+            <MenuItem icon={<IconNote />} title="Quick note" sub="Photo, voice and notes without a form" onClick={() => setView('quick')} />
+          </nav>
+
+          <section className="stack" style={{ gap: 8 }}>
+            <h2 className="section-title">Appearance</h2>
+            <ThemeToggle />
+          </section>
+        </>
+      )}
+
+      {view === 'start' && (
+        <>
+          {back('Start new form')}
+          {forms.length === 0 && <p className="empty">No forms yet. Use Import form, or wait for your coordinator to publish one. Published forms appear here automatically.</p>}
+          {forms.map((f) => (
+            <div key={f.id} className="kc-row">
+              <button className="kc-row-main" onClick={() => setOpen(f)}>
                 <b>{f.title}</b>
-                {f.definition.description && <p className="small muted">{f.definition.description}</p>}
-                <p className="form-card-meta">
-                  {n} questions · {mine[f.id] ?? 0} done on this phone{hasDraft ? ' · draft saved' : ''}
-                </p>
-              </div>
-              <span className="form-card-go"><IconChevrons width={20} /></span>
-            </button>
-          )
-        })}
-      </section>
+                <span>
+                  {flatQuestions(f.definition).length} questions · {f.id.startsWith('local-') ? 'On this phone only' : `Team form v${f.version}`}
+                  {hasDraft(f.id) ? ' · draft saved' : ''}
+                </span>
+              </button>
+              {f.id.startsWith('local-') && (
+                <button className="glass-btn sm" aria-label={`Delete ${f.title} from this phone`} onClick={() => {
+                  if (!confirm(`Remove “${f.title}” from this phone? Responses already finalised are kept.`)) return
+                  removeLocalForm(f.id)
+                  localStorage.removeItem(draftKey(f.id))
+                  setLocal(localForms())
+                }}><IconTrash /></button>
+              )}
+              <span className="form-card-go" aria-hidden="true"><IconChevrons width={18} /></span>
+            </div>
+          ))}
+        </>
+      )}
 
-      <section className="stack" style={{ gap: 10 }}>
-        <h2 className="section-title">Quick capture</h2>
-        <button className="form-card quick" onClick={() => setQuick(true)}>
-          <span className="quick-icon"><IconPlus width={24} /></span>
+      {view === 'drafts' && (
+        <>
+          {back('Drafts')}
+          {drafts.length === 0 && <p className="empty">No drafts. If you leave a form before finalising it, your answers wait here.</p>}
+          {drafts.map((f) => (
+            <div key={f.id} className="kc-row">
+              <button className="kc-row-main" onClick={() => setOpen(f)}>
+                <b>{f.title}</b>
+                <span>Tap to continue. Photos and recordings from an unfinished form need to be taken again.</span>
+              </button>
+              <button className="glass-btn sm" aria-label={`Discard draft of ${f.title}`} onClick={() => {
+                if (!confirm(`Discard your unfinished answers for “${f.title}”?`)) return
+                localStorage.removeItem(draftKey(f.id))
+                setLocal(localForms())
+              }}><IconTrash /></button>
+            </div>
+          ))}
+        </>
+      )}
+
+      {view === 'ready' && (
+        <>
+          {back('Ready to send', <button className="btn btn-lime btn-sm" onClick={() => void sendAll()} disabled={!online || sending || !ready.length}>{sending ? 'Sending…' : 'Send all'}</button>)}
+          {!online && ready.length > 0 && <p className="note-warn">You are offline. Everything here is safe on this phone and sends automatically when you are back online.</p>}
+          {localStorage.getItem('spatren.syncError') && ready.length > 0 && online && <p className="note-err">Last attempt: {localStorage.getItem('spatren.syncError')}</p>}
+          {ready.length === 0 && <p className="empty">Nothing waiting. Everything has been sent.</p>}
+          <RecordList records={ready} formTitle={formTitle} />
+        </>
+      )}
+
+      {view === 'sent' && (
+        <>
+          {back('Sent')}
+          {sent.length === 0 && <p className="empty">Nothing sent from this phone yet.</p>}
+          <RecordList records={sent.slice(0, 100)} formTitle={formTitle} />
+        </>
+      )}
+
+      {view === 'import' && (
+        <>
+          {back('Import form')}
+          <section className="card">
+            <FormImport isAdmin={isAdmin} onDone={(m) => { setToast(m); setLocal(localForms()); setView('start') }} />
+          </section>
+        </>
+      )}
+    </div>
+  )
+}
+
+interface MenuItemProps {
+  icon: ReactNode
+  title: string
+  sub: string
+  count?: number
+  accent?: boolean
+  warn?: boolean
+  onClick: () => void
+}
+
+function MenuItem({ icon, title, sub, count, accent, warn, onClick }: MenuItemProps) {
+  return (
+    <button className={`kc-item ${accent ? 'accent' : ''}`} onClick={onClick}>
+      <span className="kc-icon">{icon}</span>
+      <span className="grow">
+        <b>{title}</b>
+        <span>{sub}</span>
+      </span>
+      {count != null && count > 0 && <span className={`kc-count ${warn ? 'warn' : ''}`}>{count}</span>}
+      <IconChevrons width={18} className="kc-chev" />
+    </button>
+  )
+}
+
+function RecordList({ records, formTitle }: { records: LocalRecord[]; formTitle: (r: LocalRecord) => string }) {
+  return (
+    <div className="people">
+      {records.map((r) => (
+        <div key={r.id} className="person-row">
           <div className="grow">
-            <b>Observation, interview or note</b>
-            <p className="small muted">Photo, voice, GPS and notes, without a survey.</p>
+            <b>{r.title && r.title !== formTitle(r) ? r.title : formTitle(r)}</b>
+            <p className="small muted tnum">
+              {formTitle(r)} · {new Date(r.recorded_at).toLocaleDateString([], { day: 'numeric', month: 'short' })} {clock(r.recorded_at)} · {r.media.length} file{r.media.length === 1 ? '' : 's'}
+            </p>
           </div>
-        </button>
-      </section>
+        </div>
+      ))}
     </div>
   )
 }

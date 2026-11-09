@@ -5,6 +5,8 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import './styles.css'
 import './map.css'
 import './ui.css'
+import './theme.css'
+import './lib/theme'
 import App from './App'
 
 registerSW({ immediate: true })

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { IconGoogle } from './icons'
+import { StackedLogo } from './Theme'
 
 function friendly(message: string): string {
   if (/provider is not enabled|unsupported provider/i.test(message)) return 'Google sign-in is not switched on yet. Use "Join without Google" for now, or ask the class rep.'
@@ -38,7 +39,7 @@ export default function Login() {
   return (
     <div className="auth">
       <div className="auth-card">
-        <img src="/logo-stacked.svg" alt="SPATREN" style={{ width: 132, height: 132, margin: '-24px 0 -18px -22px' }} />
+        <StackedLogo style={{ width: 132, height: 132, margin: '-24px 0 -18px -22px' }} />
         <h1 className="auth-hero">
           Fieldwork, <em>together</em>.
         </h1>

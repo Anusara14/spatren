@@ -2,6 +2,7 @@ import { Map as MlMap, Marker, type GeoJSONSource, type LayerSpecification } fro
 import { useEffect, useRef, useState } from 'react'
 import { DISTRICT_BOUNDS } from '../lib/geo'
 import type { MeetingPoint } from '../lib/meeting'
+import { useTheme, type Theme } from '../lib/theme'
 import { IconCube, IconMinus, IconPlus2 } from './icons'
 
 const STYLE = 'https://tiles.openfreemap.org/styles/liberty' // free, no key, OSM-based, includes building heights
@@ -52,6 +53,9 @@ export default function MapView({
   const onSelectRef = useRef(onSelect)
   onSelectRef.current = onSelect
   const [tilted, setTilted] = useState(pitch > 0)
+  const { theme } = useTheme()
+  const themeRef = useRef(theme)
+  themeRef.current = theme
 
   useEffect(() => {
     if (!el.current) return
@@ -68,7 +72,7 @@ export default function MapView({
       attributionControl: { compact: true },
     })
     m.on('load', () => {
-      whiteCity(m)
+      paintCity(m, themeRef.current)
       m.addSource('trail', { type: 'geojson', data: line([]) })
       const width = (a: number, b: number) => ['interpolate', ['linear'], ['zoom'], 12, a, 17, b] as unknown as number
       m.addLayer({ id: 'trail-casing', type: 'line', source: 'trail', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': width(5, 13) } })
@@ -90,6 +94,10 @@ export default function MapView({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    if (map.current && ready.current) paintCity(map.current, theme)
+  }, [theme])
 
   // Meeting points: lime flag with a label, everyone gathers here.
   useEffect(() => {
@@ -208,9 +216,25 @@ function line(coords: [number, number][]): GeoData {
   return { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coords } }
 }
 
-// Paper-white city: pale ground, white roads, soft-lit white massing, quiet labels. Keyed on OpenMapTiles
-// source-layers so it survives style updates on OpenFreeMap.
-function whiteCity(m: MlMap): void {
+const PALETTES = {
+  light: {
+    bg: '#e8ebea', water: '#c4d7df', park: '#d6e1c2', building2d: '#f1f3f2', landuse: '#e2e5e2',
+    massLow: '#f6f7f6', massHigh: '#ffffff', road: '#ffffff', casing: '#d4dadb', rail: '#cfd5d6',
+    label: '#5d6d79', waterLabel: '#6f8f9c', halo: 'rgba(255,255,255,0.92)', light: 0.3,
+    sky: '#dfe6ea', horizon: '#f2f4f4', fog: '#eef1f1',
+  },
+  dark: {
+    bg: '#16212b', water: '#1d3442', park: '#1f2d22', building2d: '#26323d', landuse: '#1a2530',
+    massLow: '#2b3845', massHigh: '#3c4b59', road: '#2f3d4a', casing: '#22303b', rail: '#2a3742',
+    label: '#93a5b3', waterLabel: '#6f93a6', halo: 'rgba(11,21,32,0.9)', light: 0.45,
+    sky: '#0e1822', horizon: '#1b2935', fog: '#16212b',
+  },
+} as const
+
+// Paper-white city (or its night twin): pale ground, quiet roads, soft-lit massing, minimal labels.
+// Keyed on OpenMapTiles source-layers so it survives style updates on OpenFreeMap. Safe to call again on theme change.
+function paintCity(m: MlMap, theme: Theme): void {
+  const P = PALETTES[theme]
   const set = (id: string, prop: string, v: unknown) => {
     try {
       m.setPaintProperty(id, prop, v)
@@ -221,41 +245,43 @@ function whiteCity(m: MlMap): void {
   for (const layer of m.getStyle().layers ?? []) {
     const sl = (layer as LayerSpecification & { 'source-layer'?: string })['source-layer'] ?? ''
     const id = layer.id
-    if (layer.type === 'background') set(id, 'background-color', '#e8ebea')
+    if (id.startsWith('trail')) continue
+    if (layer.type === 'background') set(id, 'background-color', P.bg)
     else if (layer.type === 'fill') {
-      if (sl === 'water') set(id, 'fill-color', '#c4d7df')
+      if (sl === 'water') set(id, 'fill-color', P.water)
       else if (sl === 'park' || sl === 'landcover' || /park|grass|wood|forest|scrub/.test(id)) {
-        set(id, 'fill-color', '#d6e1c2')
+        set(id, 'fill-color', P.park)
         set(id, 'fill-opacity', 0.7)
       } else if (sl === 'building') {
-        set(id, 'fill-color', '#f1f3f2')
+        set(id, 'fill-color', P.building2d)
         m.setLayerZoomRange(id, 13, BUILDINGS_3D_FROM_ZOOM)
-      } else if (sl === 'landuse') set(id, 'fill-color', '#e2e5e2')
+      } else if (sl === 'landuse') set(id, 'fill-color', P.landuse)
       set(id, 'fill-outline-color', 'rgba(0,0,0,0)')
     } else if (layer.type === 'fill-extrusion') {
       m.setLayerZoomRange(id, BUILDINGS_3D_FROM_ZOOM, 24)
-      set(id, 'fill-extrusion-color', ['interpolate', ['linear'], ['coalesce', ['get', 'render_height'], 5], 0, '#f6f7f6', 25, '#ffffff'])
+      set(id, 'fill-extrusion-color', ['interpolate', ['linear'], ['coalesce', ['get', 'render_height'], 5], 0, P.massLow, 25, P.massHigh])
       // Rural Sri Lankan buildings rarely carry heights in OSM: give each a believable minimum mass, rising in as you zoom.
       set(id, 'fill-extrusion-height', ['interpolate', ['linear'], ['zoom'], BUILDINGS_3D_FROM_ZOOM, 0, BUILDINGS_3D_FROM_ZOOM + 0.8, ['max', ['coalesce', ['get', 'render_height'], 0], 6]])
       set(id, 'fill-extrusion-base', ['coalesce', ['get', 'render_min_height'], 0])
       set(id, 'fill-extrusion-opacity', 1)
       set(id, 'fill-extrusion-vertical-gradient', true)
     } else if (layer.type === 'line') {
-      if (sl === 'transportation') set(id, 'line-color', /casing|outline/.test(id) ? '#d4dadb' : /rail/.test(id) ? '#cfd5d6' : '#ffffff')
-      else if (sl === 'waterway') set(id, 'line-color', '#c4d7df')
+      if (sl === 'transportation') set(id, 'line-color', /casing|outline/.test(id) ? P.casing : /rail/.test(id) ? P.rail : P.road)
+      else if (sl === 'waterway') set(id, 'line-color', P.water)
       else if (sl === 'boundary') set(id, 'line-opacity', 0.25)
     } else if (layer.type === 'symbol') {
       if (sl === 'poi' || sl === 'housenumber' || sl === 'aerodrome_label' || /shield/.test(id)) m.setLayoutProperty(id, 'visibility', 'none')
       else {
-        set(id, 'text-color', sl === 'water_name' ? '#6f8f9c' : '#5d6d79')
-        set(id, 'text-halo-color', 'rgba(255,255,255,0.92)')
+        set(id, 'text-color', sl === 'water_name' ? P.waterLabel : P.label)
+        set(id, 'text-halo-color', P.halo)
         set(id, 'text-halo-width', 1.4)
       }
     }
   }
-  m.setLight({ anchor: 'viewport', color: '#ffffff', intensity: 0.3, position: [1.4, 205, 35] })
+  if (m.getLayer('trail-casing')) set('trail-casing', 'line-color', theme === 'dark' ? '#0b1520' : '#ffffff')
+  m.setLight({ anchor: 'viewport', color: '#ffffff', intensity: P.light, position: [1.4, 205, 35] })
   try {
-    m.setSky({ 'sky-color': '#dfe6ea', 'horizon-color': '#f2f4f4', 'fog-color': '#eef1f1', 'sky-horizon-blend': 0.7, 'horizon-fog-blend': 0.6, 'fog-ground-blend': 0.85, 'atmosphere-blend': 0 })
+    m.setSky({ 'sky-color': P.sky, 'horizon-color': P.horizon, 'fog-color': P.fog, 'sky-horizon-blend': 0.7, 'horizon-fog-blend': 0.6, 'fog-ground-blend': 0.85, 'atmosphere-blend': 0 })
   } catch {
     /* renderer without sky support */
   }

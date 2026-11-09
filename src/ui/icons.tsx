@@ -59,3 +59,27 @@ export const IconSync = (p: P) => (
 export const IconShield = (p: P) => (
   <svg {...base} {...p}><path d="M12 3 4.5 6v5.5c0 4.5 3.2 8.3 7.5 9.5 4.3-1.2 7.5-5 7.5-9.5V6Z" /><path d="M12 8v5M12 16.5v.01" /></svg>
 )
+export const IconFilePlus = (p: P) => (
+  <svg {...base} {...p}><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z" /><path d="M14 3v5h5M12 11v6M9 14h6" /></svg>
+)
+export const IconPencil = (p: P) => (
+  <svg {...base} {...p}><path d="M4 20h4L19 9l-4-4L4 16Z" /><path d="m13.5 6.5 4 4" /></svg>
+)
+export const IconUpload = (p: P) => (
+  <svg {...base} {...p}><path d="M12 16V4M7 9l5-5 5 5" /><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" /></svg>
+)
+export const IconCheckCircle = (p: P) => (
+  <svg {...base} {...p}><circle cx="12" cy="12" r="9" /><path d="m8 12.5 2.5 2.5L16 9.5" /></svg>
+)
+export const IconDownload = (p: P) => (
+  <svg {...base} {...p}><path d="M12 4v12M7 11l5 5 5-5" /><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" /></svg>
+)
+export const IconNote = (p: P) => (
+  <svg {...base} {...p}><rect x="4" y="3" width="16" height="18" rx="3" /><path d="M8 8h8M8 12h8M8 16h5" /></svg>
+)
+export const IconBack = (p: P) => (
+  <svg {...base} {...p}><path d="M15 6l-6 6 6 6" /></svg>
+)
+export const IconTrash = (p: P) => (
+  <svg {...base} {...p}><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" /></svg>
+)

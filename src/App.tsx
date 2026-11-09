@@ -11,6 +11,7 @@ import Control from './ui/Control'
 import Field from './ui/Field'
 import { IconChart, IconField, IconPlus, IconRadar } from './ui/icons'
 import Login from './ui/Login'
+import { Mark } from './ui/Theme'
 import FormRunner from './ui/FormRunner'
 import { SAMPLE_FORM } from './lib/forms'
 
@@ -75,7 +76,7 @@ export default function App() {
   return (
     <div className="shell">
       <nav className="tabbar" aria-label="Main">
-        <img className="rail-logo" src="/mark.svg" alt="SPATREN" />
+        <Mark className="rail-logo" size={40} />
         {tabs
           .filter((t) => !t.admin || profile.is_admin)
           .map((t) => (
@@ -87,7 +88,7 @@ export default function App() {
       </nav>
       <main className={`main ${tab === 'control' || tab === 'field' ? 'wide' : ''}`}>
         {tab === 'field' && <Field profile={profile} onRecord={() => setTab('collect')} />}
-        {tab === 'collect' && <Collect />}
+        {tab === 'collect' && <Collect isAdmin={profile.is_admin} />}
         {tab === 'control' && profile.is_admin && <Control />}
         {tab === 'admin' && profile.is_admin && <Admin />}
       </main>
@@ -100,7 +101,7 @@ function DevPreview() {
   const fake: Profile = { index_no: '242343J', full_name: 'Ranasinghe W.K.Y.A', nickname: 'Anusara', grp: 'Group 3', subgroup: 'Cultural', elective: 'Land Use', is_admin: true, status: 'approved', tracking: false }
   const h = location.hash
   if (h === '#control-preview') return <Control />
-  if (h === '#collect-preview') return <div className="main"><Collect /></div>
+  if (h === '#collect-preview') return <div className="main"><Collect isAdmin /></div>
   if (h === '#admin-preview') return <div className="main"><Admin /></div>
   if (h === '#runner-preview') return <FormRunner form={{ id: 'demo', title: SAMPLE_FORM.title, version: 1, definition: SAMPLE_FORM }} onClose={() => undefined} />
   return <Field profile={fake} onRecord={() => undefined} />
@@ -109,7 +110,7 @@ function DevPreview() {
 function Splash() {
   return (
     <div className="auth">
-      <img src="/mark.svg" alt="SPATREN" width={72} height={72} />
+      <Mark size={72} />
     </div>
   )
 }

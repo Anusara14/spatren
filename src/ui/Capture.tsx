@@ -9,16 +9,8 @@ import { IconCamera, IconClose, IconMic } from './icons'
 
 type Kind = Exclude<LocalRecord['kind'], 'survey'>
 
-export const CATEGORIES = [
-  'Land use', 'Building condition', 'Street condition', 'Road infrastructure', 'Pedestrian access', 'Public space',
-  'Transport', 'Drainage', 'Environment', 'Urban facilities', 'Community infrastructure', 'Safety', 'Accessibility issue',
-  'Heritage', 'Other',
-]
-const INTERVIEW_TYPES = ['Resident', 'Shop / business owner', 'Official', 'Community leader', 'Focus group', 'Other']
-
 export default function Capture({ onBack }: { onBack?: () => void }) {
   const [kind, setKind] = useState<Kind>('observation')
-  const [category, setCategory] = useState('')
   const [title, setTitle] = useState('')
   const [notes, setNotes] = useState('')
   const [photos, setPhotos] = useState<LocalMedia[]>([])
@@ -90,7 +82,7 @@ export default function Capture({ onBack }: { onBack?: () => void }) {
     const rec: LocalRecord = {
       id: crypto.randomUUID(),
       kind,
-      category: kind === 'interview' ? category || 'Interview' : category,
+      category: kind === 'interview' ? 'Interview' : kind === 'note' ? 'Note' : 'Observation',
       title: title.trim(),
       notes: notes.trim(),
       lat: fix?.lat ?? null,
@@ -147,19 +139,8 @@ export default function Capture({ onBack }: { onBack?: () => void }) {
       </div>
 
       <div className="field">
-        <label>{kind === 'interview' ? 'Who are you speaking with?' : 'Category'}</label>
-        <div className="choice-grid">
-          {(kind === 'interview' ? INTERVIEW_TYPES : CATEGORIES).map((c) => (
-            <button type="button" key={c} className="choice" aria-pressed={category === c} onClick={() => setCategory(category === c ? '' : c)}>
-              {c}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="field">
-        <label htmlFor="title">Title (optional)</label>
-        <input id="title" className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Flooded junction near bus stand" />
+        <label htmlFor="title">Title</label>
+        <input id="title" className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Anything: a place, a person, an issue" />
       </div>
 
       <div className="field">

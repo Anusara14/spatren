@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { supabase, type Profile } from '../lib/supabase'
+import { Mark } from './Theme'
 
 interface ClaimProps {
   profile: Profile | null
@@ -36,7 +37,7 @@ export default function Claim({ profile, onDone }: ClaimProps) {
     <div className="auth">
       <form className="auth-card card" onSubmit={submit}>
         <div className="row between">
-          <img src="/mark.svg" alt="" width={40} height={40} />
+          <Mark size={40} />
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => supabase.auth.signOut()}>
             Sign out
           </button>
