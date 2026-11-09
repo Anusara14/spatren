@@ -221,3 +221,16 @@ html:has(.immersive), body:has(.immersive) { overscroll-behavior: none; overflow
 .immersive, .dock, .map-ctrls, .tabbar { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .runner-body, .sheet, .panel { -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
 input, textarea, select { -webkit-user-select: text; user-select: text; }
+
+/* ---------- iPhone Home-Screen app: safe areas ----------
+   The status bar is translucent (black-translucent), so content must clear it; and in standalone mode
+   iOS reports 100dvh short by the status-bar height, which left a band under the map. */
+:root { --safe-t: env(safe-area-inset-top, 0px); --tab-b: max(10px, calc(var(--safe-b) - 14px)); }
+@media (max-width: 959px) {
+  .main:not(.wide) { padding-top: calc(16px + var(--safe-t)); }
+  /* scrim so scrolled pages don't run under the clock */
+  .main:not(.wide)::before { content: ''; position: fixed; inset: 0 0 auto 0; height: var(--safe-t); background: var(--bg); z-index: 45; }
+  .immersive { position: fixed; inset: 0; height: auto; }
+  .tabbar { bottom: var(--tab-b); } /* sit just above the home indicator, not 46pt up */
+  .dock { bottom: calc(80px + var(--tab-b)); }
+}
