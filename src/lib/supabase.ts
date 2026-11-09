@@ -11,6 +11,7 @@ export const supabase = createClient(url, key, {
 export type Profile = {
   index_no: string | null
   full_name: string | null
+  nickname: string | null
   grp: string | null
   subgroup: string | null
   elective: string | null
@@ -22,6 +23,7 @@ export type Profile = {
 export type TeamRow = {
   index_no: string
   full_name: string
+  nickname: string | null
   grp: string
   subgroup: string
   elective: string | null
@@ -68,3 +70,7 @@ export type RecordRow = {
   media: { path: string; type: string }[]
   data: Record<string, unknown>
 }
+
+/** What classmates call each other; falls back to the class-list name. */
+export const nameOf = (r: { nickname?: string | null; full_name?: string | null } | null | undefined): string =>
+  r?.nickname || r?.full_name || 'Unknown student'

@@ -97,7 +97,7 @@ export default function App() {
 
 // Dev-only: preview the real screens without signing in.
 function DevPreview() {
-  const fake: Profile = { index_no: '242343J', full_name: 'Ranasinghe W.K.Y.A', grp: 'Group 3', subgroup: 'Cultural', elective: 'Land Use', is_admin: true, status: 'approved', tracking: false }
+  const fake: Profile = { index_no: '242343J', full_name: 'Ranasinghe W.K.Y.A', nickname: 'Anusara', grp: 'Group 3', subgroup: 'Cultural', elective: 'Land Use', is_admin: true, status: 'approved', tracking: false }
   const h = location.hash
   if (h === '#control-preview') return <Control />
   if (h === '#collect-preview') return <div className="main"><Collect /></div>

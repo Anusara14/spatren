@@ -2,33 +2,36 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { IconGoogle } from './icons'
 
-// Google sign-in ships later; until then students join with an anonymous account that can be
-// upgraded in place (supabase.auth.linkIdentity) without losing anything they collected.
-const GOOGLE_ENABLED = import.meta.env.VITE_ENABLE_GOOGLE === '1'
+function friendly(message: string): string {
+  if (/provider is not enabled|unsupported provider/i.test(message)) return 'Google sign-in is not switched on yet. Use "Join without Google" for now, or ask the class rep.'
+  return message
+}
 
 export default function Login() {
   const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-
-  async function join() {
-    setBusy(true)
-    setError(null)
-    const { error } = await supabase.auth.signInAnonymously()
-    if (error) {
-      setError(navigator.onLine ? `Couldn't start: ${error.message}` : 'You are offline. Connect once to join; after that the app works offline.')
-      setBusy(false)
-    }
-  }
+  const [busy, setBusy] = useState<'google' | 'anon' | null>(null)
 
   async function google() {
-    setBusy(true)
+    setBusy('google')
+    setError(null)
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: window.location.origin, queryParams: { prompt: 'select_account' } },
     })
     if (error) {
-      setError(error.message)
-      setBusy(false)
+      setError(navigator.onLine ? friendly(error.message) : 'You are offline. Connect once to sign in; after that the app works offline.')
+      setBusy(null)
+    }
+  }
+
+  // Fallback: an anonymous account on this phone only. It can be linked to Google later without losing data.
+  async function join() {
+    setBusy('anon')
+    setError(null)
+    const { error } = await supabase.auth.signInAnonymously()
+    if (error) {
+      setError(navigator.onLine ? `Couldn't start: ${error.message}` : 'You are offline. Connect once to join; after that the app works offline.')
+      setBusy(null)
     }
   }
 
@@ -40,21 +43,19 @@ export default function Login() {
           Fieldwork, <em>together</em>.
         </h1>
         <p className="muted">
-          Share your live location with your coordinators during field sessions, record observations and interviews offline,
-          and call for help in one press.
+          Share your live location with your coordinators during field sessions, collect surveys offline, and call for help in
+          one press.
         </p>
-        <button className="btn btn-lime btn-block" style={{ height: 56 }} onClick={() => void join()} disabled={busy}>
-          {busy ? 'Starting…' : 'Join my field team'}
+        <button className="btn google-btn btn-block" style={{ height: 56 }} onClick={() => void google()} disabled={!!busy}>
+          <IconGoogle /> {busy === 'google' ? 'Opening Google…' : 'Continue with Google'}
         </button>
-        {GOOGLE_ENABLED && (
-          <button className="btn google-btn btn-block" onClick={() => void google()} disabled={busy}>
-            <IconGoogle /> Continue with Google
-          </button>
-        )}
+        <button className="btn btn-ghost btn-block" onClick={() => void join()} disabled={!!busy}>
+          {busy === 'anon' ? 'Starting…' : 'Join without Google'}
+        </button>
         {error && <p className="small" style={{ color: 'var(--danger)' }}>{error}</p>}
         <p className="small muted">
-          You'll confirm your university index number next. Use the same phone for the whole visit. Location is only shared
-          while Field Mode is on.
+          With Google you can sign in again on any phone. Without Google, your account lives only in this browser. You'll
+          confirm your university index next. Location is shared only while Field Mode is on.
         </p>
       </div>
     </div>

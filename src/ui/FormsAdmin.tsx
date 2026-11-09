@@ -85,11 +85,11 @@ export default function FormsAdmin() {
   async function exportCsv(f: FormListRow) {
     const [{ data: recs }, { data: team }] = await Promise.all([
       supabase.from('records').select('*').eq('kind', 'survey').eq('data->>form_id', f.id).order('recorded_at'),
-      supabase.from('team_status').select('user_id,index_no,full_name,grp,subgroup,elective'),
+      supabase.from('team_status').select('user_id,index_no,full_name,nickname,grp,subgroup,elective'),
     ])
     const who = new Map(((team ?? []) as TeamRow[]).map((t) => [t.user_id, t]))
     const qs = flatQuestions(f.definition).filter((q) => q.type !== 'note')
-    const head = ['response_id', 'recorded_at', 'form_version', 'index_no', 'name', 'group', 'subgroup', 'elective', 'lat', 'lng', 'accuracy', ...qs.map((q) => q.id)]
+    const head = ['response_id', 'recorded_at', 'form_version', 'index_no', 'name', 'nickname', 'group', 'subgroup', 'elective', 'lat', 'lng', 'accuracy', ...qs.map((q) => q.id)]
     const lines = ((recs ?? []) as RecordRow[]).map((r) => {
       const t = who.get(r.user_id)
       const answers = (r.data.answers ?? {}) as Answers
@@ -98,9 +98,9 @@ export default function FormsAdmin() {
         if ((q.type === 'photo' || q.type === 'audio') && typeof a === 'string') return r.media.find((m) => m.path.endsWith(`/${a}`))?.path ?? a
         return answerText(a)
       })
-      return [r.id, r.recorded_at, r.data.form_version, t?.index_no, t?.full_name, t?.grp, t?.subgroup, t?.elective, r.lat, r.lng, r.accuracy, ...cells].map(csvCell).join(',')
+      return [r.id, r.recorded_at, r.data.form_version, t?.index_no, t?.full_name, t?.nickname, t?.grp, t?.subgroup, t?.elective, r.lat, r.lng, r.accuracy, ...cells].map(csvCell).join(',')
     })
-    const label = ['', '', '', '', '', '', '', '', '', '', '', ...qs.map((q) => q.label)].map(csvCell).join(',')
+    const label = ['', '', '', '', '', '', '', '', '', '', '', '', ...qs.map((q) => q.label)].map(csvCell).join(',')
     download(`${slug(f.title)}-responses.csv`, '﻿' + [head.join(','), label, ...lines].join('\n'), 'text/csv')
   }
 

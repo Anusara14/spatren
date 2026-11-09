@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { clock, groupColor } from '../lib/geo'
-import { supabase, type RecordRow, type SosRow, type TeamRow } from '../lib/supabase'
+import { nameOf, supabase, type RecordRow, type SosRow, type TeamRow } from '../lib/supabase'
 import { csvCell, download } from './export'
 import WordCloud from './WordCloud'
 
@@ -89,10 +89,10 @@ export default function Summary() {
   const text = records.map((r) => `${r.title ?? ''} ${r.notes ?? ''}`).join(' ')
 
   function exportCsv() {
-    const head = ['id', 'recorded_at', 'kind', 'category', 'title', 'notes', 'lat', 'lng', 'accuracy', 'index_no', 'name', 'group', 'subgroup', 'elective', 'media']
+    const head = ['id', 'recorded_at', 'kind', 'category', 'title', 'notes', 'lat', 'lng', 'accuracy', 'index_no', 'name', 'nickname', 'group', 'subgroup', 'elective', 'media']
     const lines = records.map((r) => {
       const who = userGroup.get(r.user_id)
-      return [r.id, r.recorded_at, r.kind, r.category, r.title, r.notes, r.lat, r.lng, r.accuracy, who?.index_no, who?.full_name, who?.grp, who?.subgroup, who?.elective, r.media.map((m) => m.path).join(' | ')]
+      return [r.id, r.recorded_at, r.kind, r.category, r.title, r.notes, r.lat, r.lng, r.accuracy, who?.index_no, who?.full_name, who?.nickname, who?.grp, who?.subgroup, who?.elective, r.media.map((m) => m.path).join(' | ')]
         .map(csvCell)
         .join(',')
     })
@@ -149,7 +149,7 @@ export default function Summary() {
         <Kpi value={stats.interviews} label="Interviews" />
         <Kpi value={`${stats.photos} · ${stats.audio}`} label="Photos · audio clips" />
       </div>
-      {stats.sos > 0 && <p className="card-flat" style={{ background: 'var(--danger-wash)', color: 'var(--danger)' }}><b>{stats.sos} SOS alert{stats.sos > 1 ? 's' : ''}</b> today: {sos.map((s) => `${userGroup.get(s.user_id)?.full_name ?? '?'} at ${clock(s.created_at)} (${s.status})`).join('; ')}</p>}
+      {stats.sos > 0 && <p className="card-flat" style={{ background: 'var(--danger-wash)', color: 'var(--danger)' }}><b>{stats.sos} SOS alert{stats.sos > 1 ? 's' : ''}</b> today: {sos.map((s) => `${nameOf(userGroup.get(s.user_id))} at ${clock(s.created_at)} (${s.status})`).join('; ')}</p>}
 
       <div className="grid-2">
         <section className="card stack">

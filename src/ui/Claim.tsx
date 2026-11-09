@@ -60,8 +60,8 @@ export default function Claim({ profile, onDone }: ClaimProps) {
           />
         </div>
         <div className="field">
-          <label htmlFor="sn">Your name as on the class list (first word)</label>
-          <input id="sn" className="input" placeholder="e.g. Ranasinghe" value={surname} onChange={(e) => setSurname(e.target.value)} required />
+          <label htmlFor="sn">Your surname (as on the class list) or your nickname</label>
+          <input id="sn" className="input" placeholder="e.g. Ranasinghe or Anusara" value={surname} onChange={(e) => setSurname(e.target.value)} required />
         </div>
         {msg && <p className="small card-flat">{msg}</p>}
         <button className="btn btn-primary btn-block" disabled={busy || index.length < 7}>

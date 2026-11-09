@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ago, clock, distanceMeters, formatDistance, freshness, groupColor, mapsLink, type Freshness, GROUP_COLORS } from '../lib/geo'
-import { supabase, type SosRow, type TeamRow } from '../lib/supabase'
+import { nameOf, supabase, type SosRow, type TeamRow } from '../lib/supabase'
 import { currentFix, type Fix } from '../lib/tracking'
 import { useMeetingPoints, type MeetingPoint } from '../lib/meeting'
 import MapView, { type MapMarker } from './MapView'
@@ -110,9 +110,9 @@ export default function Control() {
       lat: r.lat!,
       lng: r.lng!,
       color: groupColor(r.grp),
-      label: initials(r.full_name),
+      label: initials(nameOf(r)),
       className: `${freshness(r)} ${r.user_id && sosUsers.has(r.user_id) ? 'mk-sos' : ''}`,
-      title: `${r.full_name} · ${r.grp} ${r.subgroup} · ${ago(r.recorded_at)}`,
+      title: `${nameOf(r)} (${r.full_name}) · ${r.grp} ${r.subgroup} · ${ago(r.recorded_at)}`,
     }))
 
   async function select(index: string) {
@@ -181,7 +181,7 @@ export default function Control() {
           <div className="alarm">
             <div className="row between">
               <div>
-                <b>SOS · {topAlertWho?.full_name ?? 'Unknown student'}</b>
+                <b>SOS · {nameOf(topAlertWho)}</b>
                 <p className="small" style={{ opacity: 0.9 }}>
                   {topAlertWho ? `${topAlertWho.grp} · ${topAlertWho.subgroup} · ` : ''}sent {clock(topAlert.created_at)} ({ago(topAlert.created_at)})
                   {topAlert.battery != null ? ` · battery ${topAlert.battery}%` : ''}
@@ -227,7 +227,7 @@ export default function Control() {
 
         {alerts.filter((a) => a.status === 'acknowledged').map((a) => (
           <div key={a.id} className="card-flat row between" style={{ background: 'var(--danger-wash)' }}>
-            <span className="small"><b>SOS acknowledged</b> · {byUser.get(a.user_id)?.full_name ?? 'Unknown'} · {clock(a.created_at)}</span>
+            <span className="small"><b>SOS acknowledged</b> · {nameOf(byUser.get(a.user_id))} · {clock(a.created_at)}</span>
             <button className="btn btn-sm btn-danger" onClick={() => void handle(a, 'resolved')}>Resolve</button>
           </div>
         ))}
@@ -236,10 +236,10 @@ export default function Control() {
           <div className="card stack" style={{ gap: 10, boxShadow: 'none', border: '1px solid var(--line)' }}>
             <div className="row between">
               <div className="row">
-                <div className="avatar" style={{ background: groupColor(sel.grp) }}>{initials(sel.full_name)}</div>
+                <div className="avatar" style={{ background: groupColor(sel.grp) }}>{initials(nameOf(sel))}</div>
                 <div>
-                  <b>{sel.full_name}</b>
-                  <p className="small muted mono">{sel.index_no}</p>
+                  <b>{nameOf(sel)}</b>
+                  <p className="small muted mono">{sel.full_name} · {sel.index_no}</p>
                 </div>
               </div>
               <button className="btn btn-ghost btn-sm" onClick={() => setSelected(null)} aria-label="Close">✕</button>
@@ -311,10 +311,10 @@ function TeamList({ rows, selected, onSelect, sosUsers, recCount }: TeamListProp
                   return (
                     <button key={r.index_no} className="person" aria-selected={selected === r.index_no} onClick={() => onSelect(r.index_no)}>
                       <div className="avatar" style={{ background: sos ? 'var(--danger)' : groupColor(r.grp), opacity: f === 'live' || sos ? 1 : 0.55 }}>
-                        {initials(r.full_name)}
+                        {initials(nameOf(r))}
                       </div>
                       <div className="grow">
-                        <div style={{ fontSize: 14, fontWeight: 600 }}>{r.full_name}</div>
+                        <div style={{ fontSize: 14, fontWeight: 600 }}>{nameOf(r)} <span className="muted" style={{ fontWeight: 400, fontSize: 12 }}>{r.full_name}</span></div>
                         <div className="small muted">
                           {r.status !== 'approved' ? 'Not joined' : `${STATUS_LABEL[f]}${r.recorded_at ? ` · ${ago(r.recorded_at)}` : ''}`}
                           {r.battery != null && r.status === 'approved' ? ` · ${r.battery}%` : ''}

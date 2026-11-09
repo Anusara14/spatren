@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { groupColor, GROUP_COLORS } from '../lib/geo'
-import { supabase, type TeamRow } from '../lib/supabase'
+import { nameOf, supabase, type TeamRow } from '../lib/supabase'
 
 export default function Team() {
   const [rows, setRows] = useState<TeamRow[]>([])
@@ -29,7 +29,7 @@ export default function Team() {
   }
 
   async function unlink(r: TeamRow) {
-    if (!confirm(`Unlink ${r.full_name} (${r.index_no}) from their phone? They can then join again on a new phone. Data they already uploaded is kept.`)) return
+    if (!confirm(`Unlink ${nameOf(r)} (${r.full_name}, ${r.index_no}) from their phone? They can then join again on a new phone. Data they already uploaded is kept.`)) return
     await supabase.from('members').delete().eq('user_id', r.user_id!)
     void load()
   }
@@ -45,7 +45,7 @@ export default function Team() {
   const joined = rows.filter((r) => r.status === 'approved').length
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase()
-    return rows.filter((r) => (grp === 'All' || r.grp === grp) && (!needle || r.full_name.toLowerCase().includes(needle) || r.index_no.toLowerCase().includes(needle)))
+    return rows.filter((r) => (grp === 'All' || r.grp === grp) && (!needle || r.full_name.toLowerCase().includes(needle) || (r.nickname ?? '').toLowerCase().includes(needle) || r.index_no.toLowerCase().includes(needle)))
   }, [rows, q, grp])
 
   return (
@@ -65,8 +65,8 @@ export default function Team() {
           {pending.map((r) => (
             <div key={r.user_id} className="list-row">
               <div className="grow">
-                <b>{r.full_name}</b>
-                <p className="small muted tnum">{r.index_no}{r.email ? ` · ${r.email}` : ''}</p>
+                <b>{nameOf(r)}</b>
+                <p className="small muted tnum">{r.full_name} · {r.index_no}{r.email ? ` · ${r.email}` : ''}</p>
               </div>
               <button className="btn btn-lime btn-sm" onClick={() => void approve(r.user_id!)}>Approve</button>
               <button className="btn btn-ghost btn-sm" onClick={() => void unlink(r)}>Reject</button>
@@ -91,8 +91,8 @@ export default function Team() {
             <div key={r.index_no} className="person-row">
               <span className="dot" style={{ background: groupColor(r.grp), width: 10, height: 10 }} />
               <div className="grow">
-                <b>{r.full_name}</b>
-                <p className="small muted tnum">{r.index_no} · {r.grp.replace('Group ', 'G')} {r.subgroup} · {r.elective}</p>
+                <b>{nameOf(r)}</b>
+                <p className="small muted tnum">{r.full_name} · {r.index_no} · {r.grp.replace('Group ', 'G')} {r.subgroup} · {r.elective}</p>
               </div>
               {r.status === 'approved' ? (
                 <button className="pill-btn" onClick={() => void unlink(r)} title="Unlink from their phone">Joined</button>

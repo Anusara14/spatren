@@ -3,10 +3,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { db } from '../lib/db'
 import { ago, clock, distanceMeters, formatDistance, groupColor, mapsLink } from '../lib/geo'
 import { askNotificationPermission, useMeetingPoints, type MeetingPoint } from '../lib/meeting'
-import type { Profile } from '../lib/supabase'
+import { nameOf, supabase, type Profile } from '../lib/supabase'
 import { syncNow, useOnline, useOutbox } from '../lib/sync'
 import { startTracking, stopTracking, useTracker } from '../lib/tracking'
-import { IconChevrons, IconClose, IconPlus, IconSync, IconWalk } from './icons'
+import { IconChevrons, IconClose, IconGoogle, IconPlus, IconSync, IconWalk } from './icons'
 import MapView from './MapView'
 import Sos from './Sos'
 
@@ -74,7 +74,7 @@ export default function Field({ profile, onRecord }: FieldProps) {
 
       <header className="title-overlay">
         <h1>Anuradhapura</h1>
-        <p>{profile.full_name?.split(' ')[0]} · {profile.elective}</p>
+        <p>Hi {nameOf(profile)} · {profile.elective}</p>
         <div className="row" style={{ gap: 6, marginTop: 12, flexWrap: 'wrap' }}>
           <span className="chip glass-chip"><span className="dot" style={{ background: groupColor(profile.grp) }} />{profile.grp} · {profile.subgroup}</span>
           {!online && <span className="chip glass-chip"><span className="dot offline" />Offline</span>}
@@ -83,7 +83,7 @@ export default function Field({ profile, onRecord }: FieldProps) {
       </header>
 
       <div className="top-right">
-        <Sos name={profile.full_name ?? profile.index_no ?? 'student'} variant="fab" />
+        <Sos name={`${nameOf(profile)} (${profile.full_name ?? ''}, ${profile.index_no ?? ''})`} variant="fab" />
       </div>
 
       {banner && (
@@ -132,7 +132,10 @@ export default function Field({ profile, onRecord }: FieldProps) {
         <div className="sheet-backdrop" onClick={() => setSheet(false)}>
           <div className="sheet stack" onClick={(e) => e.stopPropagation()}>
             <div className="row between">
-              <h2 style={{ fontSize: 22, letterSpacing: '-0.02em' }}>{profile.full_name}</h2>
+              <div>
+                <h2 style={{ fontSize: 22, letterSpacing: '-0.02em' }}>{nameOf(profile)}</h2>
+                <p className="small muted">{profile.full_name}</p>
+              </div>
               <button className="glass-btn sm" onClick={() => setSheet(false)} aria-label="Close"><IconClose /></button>
             </div>
             <div className="row" style={{ flexWrap: 'wrap', gap: 6 }}>
@@ -165,9 +168,33 @@ export default function Field({ profile, onRecord }: FieldProps) {
             <button className={`btn btn-block ${t.active ? 'btn-ghost' : 'btn-lime'}`} onClick={() => void (t.active ? stopTracking() : startTracking())}>
               {t.active ? 'Stop sharing my location' : 'Start Field Mode'}
             </button>
+            <LinkGoogle />
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// Anonymous accounts live in one browser. Linking Google keeps the same account (and everything collected)
+// so the student can sign in again on any phone.
+function LinkGoogle() {
+  const [anon, setAnon] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
+  useEffect(() => {
+    void supabase.auth.getUser().then(({ data }) => setAnon(!!data.user?.is_anonymous))
+  }, [])
+  if (!anon) return null
+  async function link() {
+    setMsg(null)
+    const { error } = await supabase.auth.linkIdentity({ provider: 'google', options: { redirectTo: window.location.origin } })
+    if (error) setMsg(/manual linking|not enabled/i.test(error.message) ? 'Google linking is not switched on yet. Ask the class rep.' : error.message)
+  }
+  return (
+    <div className="card-flat stack" style={{ gap: 8 }}>
+      <p className="small">This account is saved only in this browser. Link Google so you can sign in again if you change or reset your phone.</p>
+      <button className="btn google-btn btn-sm" onClick={() => void link()}><IconGoogle /> Link Google account</button>
+      {msg && <p className="small" style={{ color: 'var(--danger)' }}>{msg}</p>}
     </div>
   )
 }
