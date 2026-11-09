@@ -217,22 +217,21 @@
 /* ============ iOS Safari touch polish ============ */
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 button, a, [role='button'], .opt, .choice, .kc-item { touch-action: manipulation; } /* no double-tap zoom delay */
-html:has(.immersive), body:has(.immersive) { overscroll-behavior: none; overflow: hidden; } /* no rubber-band behind the map */
+/* no rubber-band behind the map. Not overflow:hidden: in an iPhone Home-Screen app that clips everything below a too-short viewport. */
+html:has(.immersive), body:has(.immersive) { overscroll-behavior: none; }
 .immersive, .dock, .map-ctrls, .tabbar { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .runner-body, .sheet, .panel { -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
 input, textarea, select { -webkit-user-select: text; user-select: text; }
 
 /* ---------- iPhone Home-Screen app: safe areas ----------
    The status bar is translucent (black-translucent), so content must clear it; and in standalone mode
-   iOS reports 100dvh short by the status-bar height, which left a band under the map. */
+   iOS reports 100dvh short by the status-bar height, so the map is pinned to the screen (fixed, inset 0) instead. */
 :root { --safe-t: env(safe-area-inset-top, 0px); --tab-b: max(10px, calc(var(--safe-b) - 14px)); }
 @media (max-width: 959px) {
   .main:not(.wide) { padding-top: calc(16px + var(--safe-t)); }
   /* scrim so scrolled pages don't run under the clock */
   .main:not(.wide)::before { content: ''; position: fixed; inset: 0 0 auto 0; height: var(--safe-t); background: var(--bg); z-index: 45; }
-  .immersive { position: fixed; inset: 0 0 calc(-1 * var(--vh-gap, 0px)); height: auto; }
-  .tabbar { bottom: calc(var(--tab-b) - var(--vh-gap, 0px)); } /* sit just above the home indicator, not 46pt up */
+  .immersive { position: fixed; inset: 0; height: auto; }
+  .tabbar { bottom: var(--tab-b); } /* sit just above the home indicator, not 46pt up */
   .dock { bottom: calc(80px + var(--tab-b)); }
 }
-/* full-screen overlays reach the real bottom too (see --vh-gap in main.tsx) */
-.sheet-backdrop, .runner { bottom: calc(-1 * var(--vh-gap, 0px)); }
