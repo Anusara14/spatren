@@ -200,3 +200,24 @@
 .loading-pane { min-height: 50vh; }
 .map-loading { background: var(--bg); background-image: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.35) 50%, transparent 70%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
 @keyframes shimmer { to { background-position: -200% 0; } }
+
+/* ============ Install guide (iPhone: Add to Home Screen) ============ */
+.install-hint {
+  display: flex; gap: 12px; align-items: flex-start; padding: 14px; border-radius: 20px;
+  background: var(--surface); box-shadow: var(--shadow-lg); border: 1px solid var(--line);
+}
+.install-hint img { border-radius: 12px; flex: none; }
+.install-hint b { font-size: 15px; }
+.install-hint p { font-size: 13px; color: var(--ink-2); line-height: 1.45; margin-top: 2px; }
+.install-hint.compact { box-shadow: none; background: var(--surface-2); }
+.kbd { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; background: var(--concrete-wash); vertical-align: -6px; color: #1f6fa8; }
+.install-float { position: absolute; z-index: 6; left: 16px; right: 16px; top: calc(150px + env(safe-area-inset-top, 0px)); max-width: 440px; animation: up 0.35s var(--ease); }
+@media (min-width: 960px) { .install-float { left: 32px; top: 190px; } }
+
+/* ============ iOS Safari touch polish ============ */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+button, a, [role='button'], .opt, .choice, .kc-item { touch-action: manipulation; } /* no double-tap zoom delay */
+html:has(.immersive), body:has(.immersive) { overscroll-behavior: none; overflow: hidden; } /* no rubber-band behind the map */
+.immersive, .dock, .map-ctrls, .tabbar { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.runner-body, .sheet, .panel { -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+input, textarea, select { -webkit-user-select: text; user-select: text; }

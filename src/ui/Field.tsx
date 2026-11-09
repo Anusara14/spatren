@@ -10,6 +10,7 @@ import { startTracking, stopTracking, useTracker } from '../lib/tracking'
 import { IconClose, IconFlag, IconPlus, IconSync, IconUsers } from './icons'
 import { lazy, Suspense } from 'react'
 import type { MapMarker } from './MapView'
+import InstallHint from './InstallHint'
 import ProfileSheet from './ProfileSheet'
 import Sos from './Sos'
 import SwipeDock from './SwipeDock'
@@ -17,7 +18,6 @@ import TeamSheet from './TeamSheet'
 
 const MapView = lazy(() => import('./MapView'))
 const IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent)
-const STANDALONE = window.matchMedia('(display-mode: standalone)').matches
 const initials = (s: string) => s.split(/[\s.]+/)[0]?.slice(0, 2).toUpperCase() ?? '?'
 
 type Sheet = null | 'details' | 'team' | 'profile' | 'meet'
@@ -192,6 +192,7 @@ export default function Field({ profile, onRecord, onProfileChange }: FieldProps
       )}
 
       {t.error && !picking && <p className="map-toast">{t.error}</p>}
+      {!picking && !openAlert && !banner && <div className="install-float"><InstallHint /></div>}
 
       {picking ? (
         <>
@@ -235,7 +236,6 @@ export default function Field({ profile, onRecord, onProfileChange }: FieldProps
               {IS_IOS
                 ? 'iPhone: keep SPATREN open with the screen on. Tracking pauses while the phone is locked; your trail fills in when you come back.'
                 : 'Keep SPATREN open while walking. Points are saved on your phone when there is no signal and uploaded later.'}
-              {IS_IOS && !STANDALONE && ' Add it to your Home Screen (Share → Add to Home Screen) so your data is never cleared.'}
             </p>
             <div className="row">
               <button className="btn btn-primary grow" onClick={() => { setSheet(null); onRecord() }}><IconPlus width={20} /> Collect</button>

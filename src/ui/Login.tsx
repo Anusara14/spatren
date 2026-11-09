@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { emailForIndex, supabase } from '../lib/supabase'
 import { IconGoogle } from './icons'
+import InstallHint, { IS_IOS, IS_STANDALONE } from './InstallHint'
 import { StackedLogo } from './Theme'
 
 type Mode = 'login' | 'signup'
@@ -115,9 +116,13 @@ export default function Login() {
         </form>
 
         <div className="or"><span>or</span></div>
+        {IS_IOS && IS_STANDALONE && (
+          <p className="small muted">On iPhone, Google sign-in can open Safari instead of returning here. If that happens, use your index and password.</p>
+        )}
         <button className="btn google-btn btn-block" onClick={() => void google()} disabled={busy}>
           <IconGoogle /> {mode === 'login' ? 'Log in with Google' : 'Sign up with Google'}
         </button>
+        <InstallHint compact />
         <p className="small muted">
           Forgot your password? Ask the class rep to reset your index, then sign up again. Location is shared only while Field Mode is on.
         </p>

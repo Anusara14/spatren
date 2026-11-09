@@ -36,6 +36,8 @@ export type LocalRecord = {
   media: LocalMedia[]
   data: Record<string, unknown>
   synced: 0 | 1 // indexable flag; synced records stay on the phone as the user's own copy
+  /** when the voice recordings were last exported via Transfer recordings (not indexed) */
+  exported?: string
 }
 
 export const db = new Dexie('spatren') as Dexie & {

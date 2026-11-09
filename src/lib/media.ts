@@ -28,14 +28,38 @@ export interface Recording {
   cancel: () => void
 }
 
+// Speech-tuned bitrates: Opus stays clear at 16 kbps; AAC (older iPhones) gets muddy below 32 kbps.
+// Speech recognisers resample to 16 kHz mono anyway, so higher rates mostly cost storage.
+const bitrateFor = (mime: string) => (mime.includes('mp4') || mime.includes('aac') ? 32_000 : 16_000)
+
 export async function startRecording(): Promise<Recording> {
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } })
+  const stream = await navigator.mediaDevices.getUserMedia({
+    // Raw-ish audio transcribes better than browser noise suppression, which smears consonants; keep level steady.
+    audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: true },
+  })
   const mimeType = pickAudioMime()
-  const rec = new MediaRecorder(stream, { ...(mimeType ? { mimeType } : {}), audioBitsPerSecond: 32_000 })
+  const rec = new MediaRecorder(stream, { ...(mimeType ? { mimeType } : {}), audioBitsPerSecond: bitrateFor(mimeType) })
   const chunks: Blob[] = []
   rec.ondataavailable = (e) => e.data.size && chunks.push(e.data)
   rec.start(5_000) // flush every 5 s so a crash loses at most a few seconds
-  const release = () => stream.getTracks().forEach((t) => t.stop())
+  // iOS stops the microphone when the screen locks: keep it awake for the whole recording.
+  let lock: WakeLockSentinel | null = null
+  const keepAwake = async () => {
+    try {
+      if ('wakeLock' in navigator && document.visibilityState === 'visible') lock = await navigator.wakeLock.request('screen')
+    } catch {
+      lock = null
+    }
+  }
+  const onVis = () => document.visibilityState === 'visible' && rec.state === 'recording' && void keepAwake()
+  void keepAwake()
+  document.addEventListener('visibilitychange', onVis)
+  const release = () => {
+    stream.getTracks().forEach((t) => t.stop())
+    document.removeEventListener('visibilitychange', onVis)
+    void lock?.release().catch(() => undefined)
+    lock = null
+  }
   return {
     stop: () =>
       new Promise<Blob>((resolve) => {

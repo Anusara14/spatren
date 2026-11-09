@@ -7,14 +7,15 @@ import { supabase } from '../lib/supabase'
 import { syncNow, useOnline } from '../lib/sync'
 import Capture from './Capture'
 import FormBuilder from './FormBuilder'
+import Transfer from './Transfer'
 import FormImport, { localForms, removeLocalForm } from './FormImport'
 import FormRunner, { type FormRow } from './FormRunner'
-import { IconBack, IconCheckCircle, IconChevrons, IconDownload, IconFilePlus, IconFormEdit, IconNote, IconPencil, IconTrash, IconUpload } from './icons'
+import { IconBack, IconCheckCircle, IconChevrons, IconDownload, IconFilePlus, IconFormEdit, IconMic, IconNote, IconPencil, IconTrash, IconUpload } from './icons'
 import { Mark } from './Theme'
 
 const FORMS_CACHE = 'spatren.forms'
 const draftKey = (id: string) => `spatren.draft.${id}`
-type View = 'home' | 'start' | 'drafts' | 'ready' | 'sent' | 'import' | 'quick' | 'build'
+type View = 'home' | 'start' | 'drafts' | 'ready' | 'sent' | 'import' | 'quick' | 'build' | 'transfer'
 
 function cachedForms(): FormRow[] {
   try {
@@ -74,6 +75,7 @@ export default function Collect({ isAdmin }: { isAdmin: boolean }) {
   const drafts = forms.filter((f) => hasDraft(f.id))
   const ready = records.filter((r) => !r.synced)
   const sent = records.filter((r) => r.synced)
+  const untransferred = records.filter((r) => !r.exported && r.media.some((m) => m.type.startsWith('audio'))).length
   const formTitle = (r: LocalRecord) => (r.kind === 'survey' ? String(r.data.form_title ?? 'Survey') : r.kind[0].toUpperCase() + r.kind.slice(1))
 
   async function sendAll() {
@@ -94,6 +96,7 @@ export default function Collect({ isAdmin }: { isAdmin: boolean }) {
       />
     )
   if (view === 'quick') return <Capture onBack={() => setView('home')} />
+  if (view === 'transfer') return <><Transfer records={records} onBack={() => setView('home')} onToast={setToast} />{toast && <div className="toast">{toast}</div>}</>
   if (view === 'build')
     return (
       <FormBuilder
@@ -133,6 +136,7 @@ export default function Collect({ isAdmin }: { isAdmin: boolean }) {
             <MenuItem icon={<IconFormEdit />} title="Create form" sub="Build questions, photo, voice, location and rules" onClick={() => { setEditing(null); setView('build') }} />
             <MenuItem icon={<IconPencil />} title="Drafts" sub="Continue unfinished forms" count={drafts.length} onClick={() => setView('drafts')} />
             <MenuItem icon={<IconUpload />} title="Ready to send" sub={ready.length ? 'Finalised, waiting to upload' : 'Nothing waiting'} count={ready.length} warn={ready.length > 0} onClick={() => setView('ready')} />
+            <MenuItem icon={<IconMic />} title="Transfer recordings" sub={untransferred ? 'Voice recordings to send to the laptop' : 'All recordings transferred'} count={untransferred} warn={untransferred > 0} onClick={() => setView('transfer')} />
             <MenuItem icon={<IconCheckCircle />} title="Sent" sub="Uploaded from this phone" count={sent.length} onClick={() => setView('sent')} />
             <MenuItem icon={<IconDownload />} title="Import form" sub="From ChatGPT, Gemini, Claude or a .json file" onClick={() => setView('import')} />
             <MenuItem icon={<IconNote />} title="Quick note" sub="Photo, voice and notes without a form" onClick={() => setView('quick')} />

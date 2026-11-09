@@ -104,6 +104,13 @@ async function syncRecord(uid: string, rec: LocalRecord): Promise<void> {
   for (let i = 0; i < media.length; i++) {
     const m = media[i]
     if (m.uploaded) continue
+    // Voice recordings never go to the cloud (storage budget + privacy). They stay on the phone and leave via
+    // Collect → Transfer recordings. The record still syncs, pointing at the file on the device.
+    if (m.type.startsWith('audio')) {
+      media[i] = { ...m, uploaded: `device://${rec.id}/${m.name}` }
+      await db.records.update(rec.id, { media })
+      continue
+    }
     const path = `${uid}/${rec.id}/${m.name}`
     const { error } = await supabase.storage.from('media').upload(path, m.blob, { contentType: m.type.split(';')[0], upsert: true })
     if (error) throw new Error(`Media upload failed: ${error.message}`)
