@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { answerText, CHATGPT_PROMPT, flatQuestions, parseForm, SAMPLE_FORM, type Answers, type FormDef } from '../lib/forms'
+import { AI_PROMPT, answerText, flatQuestions, parseForm, SAMPLE_FORM, type Answers, type FormDef } from '../lib/forms'
 import { supabase, type RecordRow, type TeamRow } from '../lib/supabase'
 import { csvCell, download } from './export'
 
@@ -23,7 +23,7 @@ export default function FormsAdmin() {
   const [counts, setCounts] = useState<Record<string, number>>({})
   const [raw, setRaw] = useState('')
   const [replacing, setReplacing] = useState<FormListRow | null>(null)
-  const [parsed, setParsed] = useState<{ form?: FormDef; errors: string[] } | null>(null)
+  const [parsed, setParsed] = useState<{ form?: FormDef; errors: string[]; warnings: string[] } | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -64,11 +64,21 @@ export default function FormsAdmin() {
 
   async function copyPrompt() {
     try {
-      await navigator.clipboard.writeText(CHATGPT_PROMPT)
-      setMsg('Prompt copied. Paste it into ChatGPT, describe your survey after it, then paste the JSON reply here.')
+      await navigator.clipboard.writeText(AI_PROMPT)
+      setMsg('Prompt copied. Paste it into ChatGPT, Gemini or Claude, describe your survey at the end, then bring the JSON reply back here.')
     } catch {
-      setRaw(CHATGPT_PROMPT)
+      setRaw(AI_PROMPT)
       setMsg('Clipboard blocked, so the prompt is in the box below. Copy it from there.')
+    }
+  }
+
+  async function pasteJson() {
+    try {
+      const t = await navigator.clipboard.readText()
+      setRaw(t)
+      check(t)
+    } catch {
+      setMsg('Clipboard access blocked. Long-press the box below and choose Paste.')
     }
   }
 
@@ -97,11 +107,12 @@ export default function FormsAdmin() {
   return (
     <div className="stack" style={{ gap: 18 }}>
       <section className="card stack">
-        <h2 className="section-title" style={{ margin: 0 }}>{replacing ? `Update “${replacing.title}”` : 'Add a survey'}</h2>
+        <h2 className="section-title" style={{ margin: 0 }}>{replacing ? `Update “${replacing.title}”` : 'Import a survey made by AI'}</h2>
+        <p className="small muted">Ask ChatGPT, Gemini, Claude or any other assistant for a survey as JSON. SPATREN reads it and builds the form, including photo, voice and GPS questions.</p>
         <ol className="steps">
-          <li><button className="link-btn" onClick={() => void copyPrompt()}>Copy the ChatGPT prompt</button> and describe your survey after it.</li>
-          <li>Paste ChatGPT's JSON reply below, or <button className="link-btn" onClick={() => fileRef.current?.click()}>upload a .json file</button>.</li>
-          <li>Check it, then publish. It appears on every phone's Collect tab.</li>
+          <li><button className="link-btn" onClick={() => void copyPrompt()}>Copy the AI prompt</button>, paste it into your AI chat and describe the survey at the end.</li>
+          <li>Copy the AI's JSON reply, then <button className="link-btn" onClick={() => void pasteJson()}>paste it here</button> or <button className="link-btn" onClick={() => fileRef.current?.click()}>upload a .json file</button>.</li>
+          <li>Check the preview and publish. It appears on every phone's Collect tab.</li>
         </ol>
         <input ref={fileRef} type="file" accept=".json,application/json,text/plain" hidden onChange={(e) => {
           const f = e.target.files?.[0]
@@ -119,6 +130,12 @@ export default function FormsAdmin() {
           <div className="note-err" role="alert">
             <b>Fix these and check again</b>
             <ul>{parsed.errors.slice(0, 12).map((e) => <li key={e}>{e}</li>)}</ul>
+          </div>
+        )}
+        {parsed?.form && parsed.warnings.length > 0 && (
+          <div className="note-warn">
+            <b>Imported with {parsed.warnings.length} adjustment{parsed.warnings.length > 1 ? 's' : ''}</b>
+            <ul>{parsed.warnings.slice(0, 8).map((w) => <li key={w}>{w}</li>)}</ul>
           </div>
         )}
         {parsed?.form && (

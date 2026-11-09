@@ -29,8 +29,8 @@
   --r-lg: 26px;
   --shadow: 0 1px 2px rgba(19, 40, 60, 0.06), 0 8px 24px rgba(19, 40, 60, 0.07);
   --shadow-lg: 0 24px 60px rgba(19, 40, 60, 0.18);
-  --font: 'Geist', 'Noto Sans Sinhala', 'Noto Sans Tamil', system-ui, -apple-system, sans-serif;
-  --mono: 'Geist Mono', ui-monospace, monospace;
+  --font: 'Inter', 'Noto Sans Sinhala', 'Noto Sans Tamil', system-ui, -apple-system, sans-serif;
+  --mono: 'Inter', ui-monospace, monospace; /* one family everywhere; numbers use tabular figures */
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   --safe-b: env(safe-area-inset-bottom, 0px);
 }
@@ -38,6 +38,7 @@
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; }
 body {
+  font-feature-settings: 'cv11', 'ss03'; /* Inter: single-storey a, rounder quotes */
   margin: 0;
   font-family: var(--font);
   color: var(--ink);
@@ -49,7 +50,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 :focus-visible { outline: 3px solid var(--lime); outline-offset: 2px; }
 h1, h2, h3, p { margin: 0; }
-.mono { font-family: var(--mono); letter-spacing: -0.01em; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; letter-spacing: 0; }
 .muted { color: var(--ink-3); }
 .small { font-size: 13px; }
 .row { display: flex; align-items: center; gap: 10px; }

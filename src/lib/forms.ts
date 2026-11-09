@@ -44,19 +44,25 @@ export const LIKERT = ['Strongly disagree', 'Disagree', 'Neutral', 'Agree', 'Str
 const ID_RE = /^[a-z][a-z0-9_]{0,40}$/
 
 // Validate untrusted JSON (pasted from ChatGPT or uploaded). Returns a clean definition or readable errors.
-export function parseForm(raw: string): { form?: FormDef; errors: string[] } {
+export function parseForm(raw: string): { form?: FormDef; errors: string[]; warnings: string[] } {
   let j: unknown
+  const text = stripFences(raw)
   try {
-    j = JSON.parse(stripFences(raw))
+    j = JSON.parse(text)
   } catch (e: unknown) {
-    return { errors: [`Not valid JSON: ${e instanceof Error ? e.message : 'parse error'}. Paste only the JSON ChatGPT gave you.`] }
+    try {
+      j = JSON.parse(lenient(text)) // trailing commas, // comments, smart quotes
+    } catch {
+      return { errors: [`Not valid JSON: ${e instanceof Error ? e.message : 'parse error'}. Paste only the JSON block the AI gave you.`], warnings: [] }
+    }
   }
   const errors: string[] = []
-  const o = j as Record<string, unknown>
-  if (!o || typeof o !== 'object') return { errors: ['The JSON must be an object with "title" and "sections".'] }
+  const warnings: string[] = []
+  const o = normalize(j)
+  if (!o || typeof o !== 'object') return { errors: ['The JSON must describe a form with a title and questions.'], warnings }
   const title = typeof o.title === 'string' ? o.title.trim() : ''
   if (!title) errors.push('Missing "title".')
-  if (!Array.isArray(o.sections) || !o.sections.length) errors.push('"sections" must be a non-empty list.')
+  if (!Array.isArray(o.sections) || !o.sections.length) errors.push('No questions found. The JSON needs a "questions" or "sections" list.')
 
   const ids = new Set<string>()
   const sections: Section[] = []
@@ -72,20 +78,24 @@ export function parseForm(raw: string): { form?: FormDef; errors: string[] } {
       const q = qRaw as Record<string, unknown>
       const at = `${where}, question ${qi + 1}`
       const id = String(q?.id ?? '').trim()
-      const type = String(q?.type ?? '') as QuestionType
+      let type = String(q?.type ?? '') as QuestionType
       const label = typeof q?.label === 'string' ? q.label.trim() : ''
       if (!ID_RE.test(id)) errors.push(`${at}: "id" must be lowercase letters, digits or _ (got "${id}").`)
       else if (ids.has(id)) errors.push(`${at}: duplicate id "${id}".`)
       ids.add(id)
-      if (!QUESTION_TYPES.includes(type)) errors.push(`${at}: unknown type "${type}". Use one of: ${QUESTION_TYPES.join(', ')}.`)
+      if (!QUESTION_TYPES.includes(type)) {
+        warnings.push(`${at} (“${label || id}”): type "${type || 'missing'}" isn't supported, so it was imported as short text.`)
+        type = 'text'
+      }
       if (!label) errors.push(`${at}: missing "label".`)
       const options = Array.isArray(q?.options) ? q.options.map((x) => String(x).trim()).filter(Boolean) : undefined
       if ((type === 'select_one' || type === 'select_multiple') && (!options || options.length < 2)) {
         errors.push(`${at}: "${type}" needs an "options" list with at least 2 choices.`)
       }
-      const showIf = q?.show_if as ShowIf | undefined
-      if (showIf && (typeof showIf.question !== 'string' || !ids.has(showIf.question))) {
-        errors.push(`${at}: show_if.question must refer to an EARLIER question id.`)
+      let showIf = q?.show_if as ShowIf | undefined
+      if (showIf && (typeof showIf.question !== 'string' || !ids.has(showIf.question) || showIf.question === id)) {
+        warnings.push(`${at} (“${label || id}”): its condition points to "${showIf.question}", which isn't an earlier question, so it will always be shown.`)
+        showIf = undefined
       }
       questions.push({
         id, type, label,
@@ -99,8 +109,153 @@ export function parseForm(raw: string): { form?: FormDef; errors: string[] } {
     }
     sections.push({ title: typeof s.title === 'string' && s.title.trim() ? s.title.trim() : `Section ${si + 1}`, questions })
   }
-  if (errors.length) return { errors }
-  return { form: { title, description: typeof o.description === 'string' ? o.description : undefined, sections }, errors: [] }
+  if (errors.length) return { errors, warnings }
+  return { form: { title, description: typeof o.description === 'string' ? o.description : undefined, sections }, errors: [], warnings }
+}
+
+// ---------- Tolerant import: accept the shapes ChatGPT / Gemini / Claude actually produce ----------
+
+const TYPE_ALIASES: Record<string, QuestionType> = {
+  text: 'text', short_text: 'text', shorttext: 'text', string: 'text', input: 'text', short_answer: 'text', name: 'text',
+  textarea: 'textarea', long_text: 'textarea', longtext: 'textarea', paragraph: 'textarea', essay: 'textarea',
+  open_ended: 'textarea', open: 'textarea', comment: 'textarea', comments: 'textarea', long_answer: 'textarea',
+  integer: 'integer', int: 'integer', number: 'integer', numeric: 'integer', count: 'integer',
+  decimal: 'decimal', float: 'decimal', double: 'decimal', currency: 'decimal',
+  select_one: 'select_one', single_choice: 'select_one', single_select: 'select_one', radio: 'select_one', dropdown: 'select_one',
+  select: 'select_one', choice: 'select_one', multiple_choice: 'select_one', mcq: 'select_one', option: 'select_one',
+  select_multiple: 'select_multiple', multi_select: 'select_multiple', multiselect: 'select_multiple', checkbox: 'select_multiple',
+  checkboxes: 'select_multiple', multiple_select: 'select_multiple', multi_choice: 'select_multiple', multiple_answer: 'select_multiple',
+  yes_no: 'yes_no', yesno: 'yes_no', boolean: 'yes_no', bool: 'yes_no', true_false: 'yes_no', acknowledge: 'yes_no',
+  rating: 'rating', stars: 'rating', star_rating: 'rating', scale: 'rating', range: 'rating',
+  likert: 'likert', agreement: 'likert', likert_scale: 'likert', agree_disagree: 'likert',
+  date: 'date', datetime: 'date', day: 'date', time: 'time',
+  gps: 'gps', geopoint: 'gps', location: 'gps', coordinates: 'gps', geolocation: 'gps', map: 'gps',
+  photo: 'photo', image: 'photo', picture: 'photo', camera: 'photo', file_image: 'photo',
+  audio: 'audio', voice: 'audio', recording: 'audio', voice_note: 'audio', audio_recording: 'audio',
+  note: 'note', info: 'note', instruction: 'note', instructions: 'note', text_block: 'note', description: 'note', consent_note: 'note',
+}
+
+const pick = (o: Record<string, unknown>, ...keys: string[]): unknown => {
+  for (const k of keys) if (o[k] !== undefined && o[k] !== null && o[k] !== '') return o[k]
+  return undefined
+}
+
+const slugId = (s: string) =>
+  s.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').replace(/^(\d)/, 'q_$1').slice(0, 40) || 'q'
+
+function labelOf(v: unknown): string {
+  if (typeof v === 'string') return v
+  if (v && typeof v === 'object') {
+    const l = v as Record<string, unknown>
+    // multilingual labels: prefer English, else the first value
+    return String(l.en ?? l.English ?? l.english ?? l['label::English (en)'] ?? Object.values(l)[0] ?? '')
+  }
+  return v == null ? '' : String(v)
+}
+
+function normalize(input: unknown): Record<string, unknown> {
+  let root = input as Record<string, unknown> | unknown[]
+  if (Array.isArray(root)) root = { title: 'Imported survey', questions: root }
+  let o = root as Record<string, unknown>
+  for (const wrap of ['form', 'survey_form', 'questionnaire']) if (o[wrap] && typeof o[wrap] === 'object' && !Array.isArray(o[wrap])) o = { ...(o[wrap] as Record<string, unknown>), ...o, [wrap]: undefined }
+
+  // XLSForm-style JSON: { survey: [{type:"select_one yn", name, label}], choices: [{list_name, name, label}] }
+  const choiceLists = new Map<string, string[]>()
+  if (Array.isArray(o.choices)) {
+    for (const c of o.choices as Record<string, unknown>[]) {
+      const list = String(pick(c, 'list_name', 'list', 'listName') ?? '')
+      if (list) choiceLists.set(list, [...(choiceLists.get(list) ?? []), labelOf(pick(c, 'label', 'name', 'value'))])
+    }
+  }
+  const rawSections = pick(o, 'sections', 'pages', 'groups', 'steps', 'parts')
+  const rawQuestions = pick(o, 'questions', 'fields', 'items', 'survey', 'elements')
+  let sections: Record<string, unknown>[] = Array.isArray(rawSections)
+    ? (rawSections as Record<string, unknown>[])
+    : Array.isArray(rawQuestions)
+      ? [{ title: 'Questions', questions: rawQuestions }]
+      : []
+  // XLSForm begin_group/end_group rows → sections
+  if (!Array.isArray(rawSections) && Array.isArray(rawQuestions) && (rawQuestions as Record<string, unknown>[]).some((r) => /begin[_ ]group/i.test(String(r?.type ?? '')))) {
+    sections = []
+    let cur: Record<string, unknown> = { title: 'Questions', questions: [] as unknown[] }
+    for (const r of rawQuestions as Record<string, unknown>[]) {
+      const t = String(r?.type ?? '')
+      if (/begin[_ ]group/i.test(t)) {
+        if ((cur.questions as unknown[]).length) sections.push(cur)
+        cur = { title: labelOf(r.label) || String(r.name ?? 'Section'), questions: [] }
+      } else if (/end[_ ]group/i.test(t)) {
+        if ((cur.questions as unknown[]).length) sections.push(cur)
+        cur = { title: 'More questions', questions: [] }
+      } else (cur.questions as unknown[]).push(r)
+    }
+    if ((cur.questions as unknown[]).length) sections.push(cur)
+  }
+
+  const used = new Set<string>()
+  const normSections = sections.map((s, si) => {
+    const qs = pick(s, 'questions', 'fields', 'items', 'elements')
+    return {
+      title: labelOf(pick(s, 'title', 'name', 'label', 'heading')) || `Section ${si + 1}`,
+      questions: (Array.isArray(qs) ? (qs as Record<string, unknown>[]) : []).map((q) => normalizeQuestion(q, choiceLists, used)),
+    }
+  })
+  return {
+    title: labelOf(pick(o, 'title', 'name', 'form_title', 'survey_title')) || 'Imported survey',
+    description: labelOf(pick(o, 'description', 'intro', 'instructions', 'subtitle')) || undefined,
+    sections: normSections,
+  }
+}
+
+function normalizeQuestion(q: Record<string, unknown>, lists: Map<string, string[]>, used: Set<string>): Record<string, unknown> {
+  if (!q || typeof q !== 'object') return { id: '', type: '', label: '' }
+  const label = labelOf(pick(q, 'label', 'question', 'text', 'title', 'prompt'))
+  let rawType = String(pick(q, 'type', 'question_type', 'kind', 'input_type', 'inputType') ?? '').trim()
+  let options: unknown = pick(q, 'options', 'choices', 'answers', 'values', 'items')
+  // XLSForm "select_one listname"
+  const xls = rawType.match(/^(select_one|select_multiple)\s+(\S+)/i)
+  if (xls) {
+    rawType = xls[1]
+    if (!options) options = lists.get(xls[2])
+  }
+  const key = rawType.toLowerCase().replace(/[\s/-]+/g, '_')
+  let type: string = TYPE_ALIASES[key] ?? key
+  if (q.multiple === true || q.allow_multiple === true || q.multi === true) type = type === 'select_one' ? 'select_multiple' : type
+  const opts = Array.isArray(options) ? options.map((x) => labelOf(typeof x === 'object' && x ? pick(x as Record<string, unknown>, 'label', 'text', 'value', 'name') : x)).filter(Boolean) : undefined
+  if (type === 'select_one' && opts && opts.length === 2 && opts.every((x) => /^(yes|no)$/i.test(x))) type = 'yes_no'
+  // Rating / scale with explicit labelled options is really a single choice
+  if ((type === 'rating' || type === 'likert') && opts && opts.length && opts.length !== 5) type = 'select_one'
+
+  let id = String(pick(q, 'id', 'name', 'key', 'variable', 'field') ?? '').trim()
+  id = id ? slugId(id) : slugId(label)
+  let unique = id
+  for (let n = 2; used.has(unique); n++) unique = `${id.slice(0, 36)}_${n}`
+  used.add(unique)
+
+  const cond = pick(q, 'show_if', 'showIf', 'visible_if', 'visibleIf', 'condition', 'depends_on', 'dependsOn') as Record<string, unknown> | undefined
+  const showIf = cond && typeof cond === 'object'
+    ? { question: slugId(String(pick(cond, 'question', 'field', 'id', 'name') ?? '')), ...(cond.in ? { in: cond.in as string[] } : { equals: (pick(cond, 'equals', 'value', 'is', 'eq') as string) }) }
+    : undefined
+
+  const req = pick(q, 'required', 'mandatory', 'isRequired', 'is_required')
+  return {
+    id: unique,
+    type,
+    label,
+    hint: labelOf(pick(q, 'hint', 'help', 'helper', 'description', 'placeholder')) || undefined,
+    required: req === true || req === 'yes' || req === 'true',
+    options: opts,
+    min: typeof pick(q, 'min', 'minimum') === 'number' ? pick(q, 'min', 'minimum') : undefined,
+    max: typeof pick(q, 'max', 'maximum') === 'number' ? pick(q, 'max', 'maximum') : undefined,
+    show_if: showIf,
+  }
+}
+
+function lenient(s: string): string {
+  return s
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .replace(/^\s*\/\/.*$/gm, '')
+    .replace(/,\s*([}\]])/g, '$1')
 }
 
 function stripFences(s: string): string {
@@ -175,7 +330,7 @@ export const SAMPLE_FORM: FormDef = {
   ],
 }
 
-export const CHATGPT_PROMPT = `You are helping urban-planning students build a field survey for the SPATREN app.
+export const AI_PROMPT = `You are helping urban-planning students build a field survey for the SPATREN app.
 Create the survey I describe below and reply with ONLY one JSON object (no explanation) in exactly this format:
 
 {
