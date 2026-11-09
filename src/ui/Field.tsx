@@ -7,13 +7,15 @@ import { avatarUrl, nameOf, supabase, type Profile } from '../lib/supabase'
 import { syncNow, useOnline, useOutbox } from '../lib/sync'
 import { useTeam } from '../lib/team'
 import { startTracking, stopTracking, useTracker } from '../lib/tracking'
-import { IconClose, IconPlus, IconSync, IconUsers } from './icons'
-import MapView, { type MapMarker } from './MapView'
+import { IconClose, IconFlag, IconPlus, IconSync, IconUsers } from './icons'
+import { lazy, Suspense } from 'react'
+import type { MapMarker } from './MapView'
 import ProfileSheet from './ProfileSheet'
 import Sos from './Sos'
 import SwipeDock from './SwipeDock'
 import TeamSheet from './TeamSheet'
 
+const MapView = lazy(() => import('./MapView'))
 const IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent)
 const STANDALONE = window.matchMedia('(display-mode: standalone)').matches
 const initials = (s: string) => s.split(/[\s.]+/)[0]?.slice(0, 2).toUpperCase() ?? '?'
@@ -78,6 +80,7 @@ export default function Field({ profile, onRecord, onProfileChange }: FieldProps
       lng: m.lng!,
       color: groupColor(m.grp),
       label: initials(nameOf(m)),
+      name: nameOf(m),
       avatar: avatarUrl(m.avatar),
       className: `${freshness(m)} ${sosUsers.has(m.user_id) ? 'mk-sos' : ''}`,
       title: `${nameOf(m)} · ${m.grp} ${m.subgroup} · ${ago(m.recorded_at)}`,
@@ -109,6 +112,7 @@ export default function Field({ profile, onRecord, onProfileChange }: FieldProps
 
   return (
     <div className="immersive">
+      <Suspense fallback={<div className="map map-loading" />}>
       <MapView
         me={t.fix}
         markers={markers}
@@ -119,8 +123,18 @@ export default function Field({ profile, onRecord, onProfileChange }: FieldProps
         onMeetingClick={(m) => { setDismissed((d) => d.filter((x) => x !== m.id)); show(m.lat, m.lng) }}
         onCenter={picking ? (c) => { pickCenter.current = c } : null}
         controlsBottom="calc(176px + var(--safe-b))"
-        topControl={<Sos name={`${nameOf(profile)} (${profile.index_no ?? ''})`} variant="fab" />}
+        topControl={
+          <>
+            <Sos name={`${nameOf(profile)} (${profile.index_no ?? ''})`} variant="fab" />
+            {profile.is_admin && !picking && (
+              <button className="glass-btn pin-btn" aria-label="Drop a meeting pin" title="Drop a meeting pin" onClick={startPick}>
+                <IconFlag />
+              </button>
+            )}
+          </>
+        }
       />
+      </Suspense>
 
       <header className="title-overlay">
         <h1>Anuradhapura</h1>

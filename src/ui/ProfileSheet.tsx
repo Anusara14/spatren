@@ -6,9 +6,8 @@ import { stopTracking } from '../lib/tracking'
 import { IconClose, IconGoogle, IconSync } from './icons'
 import { ThemeToggle } from './Theme'
 
-const BASE_SEEDS = ['Aneka', 'Felix', 'Jasper', 'Luna', 'Milo', 'Nova', 'Orion', 'Pepper', 'Quinn', 'Riley', 'Sage', 'Theo', 'Uma', 'Vivi', 'Wren', 'Zara']
-const randomSeeds = () => Array.from({ length: 16 }, () => Math.random().toString(36).slice(2, 10))
-
+const BASE_SEEDS = ['Aneka', 'Felix', 'Jasper', 'Luna', 'Milo', 'Nova', 'Orion', 'Pepper', 'Quinn', 'Riley', 'Sage', 'Theo', 'Uma', 'Vivi', 'Wren', 'Zara', 'Kiran', 'Asha', 'Dilan', 'Mali', 'Nila', 'Ravi', 'Sena', 'Tara']
+const randomSeeds = () => Array.from({ length: 24 }, () => Math.random().toString(36).slice(2, 10))
 interface Props {
   profile: Profile
   onClose: () => void
@@ -75,13 +74,13 @@ export default function ProfileSheet({ profile, onClose, onChanged }: Props) {
             <h3 className="section-title" style={{ margin: 0 }}>Avatar</h3>
             <button className="btn btn-ghost btn-sm" onClick={() => setSeeds(randomSeeds())}><IconSync width={16} /> More</button>
           </div>
-          <div className="avatar-grid" role="radiogroup" aria-label="Choose an avatar">
+          <div className="avatar-wrap"><div className="avatar-grid" role="radiogroup" aria-label="Choose an avatar">
             {seeds.map((s) => (
               <button key={s} role="radio" aria-checked={avatar === s} className="avatar-opt" onClick={() => void pick(s)}>
                 <img src={avatarUrl(s)!} alt={`Avatar ${s}`} loading="lazy" referrerPolicy="no-referrer" />
               </button>
             ))}
-          </div>
+          </div></div>
           <p className="tiny muted">Avatars: DiceBear “Adventurer Neutral” by Lisa Wischofsky, CC BY 4.0.</p>
         </section>
 

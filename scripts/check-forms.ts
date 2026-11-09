@@ -1,6 +1,6 @@
 // Self-check for the tolerant form importer. Run: node scripts/check-forms.ts
 import assert from 'node:assert/strict'
-import { flatQuestions, parseForm } from '../src/lib/forms.ts'
+import { finaliseForm, flatQuestions, parseForm } from '../src/lib/forms.ts'
 
 // 1. Gemini/ChatGPT style: flat "questions", synonyms for keys and types, no ids, code fence, trailing comma.
 const gemini = parseForm(`Here you go:
@@ -63,4 +63,21 @@ assert.ok(parseForm('not json at all').errors.length > 0)
 const arr = parseForm(JSON.stringify([{ label: 'Age', type: 'number' }]))
 assert.equal(flatQuestions(arr.form!)[0].type, 'integer')
 
-console.info('forms importer: all checks passed')
+// 6. Builder save: readable ids from labels, unique, skip-logic follows the rename, published ids kept stable.
+const built = finaliseForm({
+  title: '  Street audit ',
+  sections: [{ title: 'S', questions: [
+    { id: 'q_a1', type: 'yes_no', label: 'Footpath present?', required: true },
+    { id: 'q_b2', type: 'select_multiple', label: 'Problems', options: [' Broken ', '', 'Blocked'], show_if: { question: 'q_a1', equals: 'Yes' } },
+    { id: 'q_c3', type: 'text', label: 'Problems' },
+    { id: 'old_column', type: 'gps', label: 'Where' },
+  ] }],
+})
+const bq = flatQuestions(built)
+assert.equal(built.title, 'Street audit')
+assert.deepEqual(bq.map((q) => q.id), ['footpath_present', 'problems', 'problems_2', 'old_column'])
+assert.equal(bq[1].show_if?.question, 'footpath_present')
+assert.deepEqual(bq[1].options, ['Broken', 'Blocked'])
+assert.deepEqual(parseForm(JSON.stringify(built)).errors, [])
+
+console.info('forms importer + builder: all checks passed')

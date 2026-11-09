@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { answerText, flatQuestions, type Answers, type FormDef } from '../lib/forms'
 import { supabase, type RecordRow, type TeamRow } from '../lib/supabase'
 import { csvCell, download } from './export'
+import FormBuilder from './FormBuilder'
 import FormImport from './FormImport'
 
 interface FormListRow {
@@ -18,6 +19,7 @@ export default function FormsAdmin() {
   const [forms, setForms] = useState<FormListRow[]>([])
   const [counts, setCounts] = useState<Record<string, number>>({})
   const [editing, setEditing] = useState<FormListRow | null>(null)
+  const [asJson, setAsJson] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -58,17 +60,24 @@ export default function FormsAdmin() {
     download(`${slug(f.title)}-responses.csv`, '﻿' + [head.join(','), label, ...lines].join('\n'), 'text/csv')
   }
 
+  if (editing && !asJson)
+    return (
+      <div className="stack" style={{ gap: 8 }}>
+        <button className="link-btn" style={{ alignSelf: 'flex-end' }} onClick={() => setAsJson(true)}>Edit as JSON instead</button>
+        <FormBuilder isAdmin initial={editing.definition} replacing={editing} onCancel={() => setEditing(null)} onDone={(m) => { setEditing(null); setMsg(m); void load() }} />
+      </div>
+    )
   if (editing)
     return (
       <section className="card stack">
         <h2 className="section-title" style={{ margin: 0 }}>Update “{editing.title}”</h2>
-        <FormImport isAdmin replacing={editing} onCancel={() => setEditing(null)} onDone={(m) => { setEditing(null); setMsg(m); void load() }} />
+        <FormImport isAdmin replacing={editing} onCancel={() => { setEditing(null); setAsJson(false) }} onDone={(m) => { setEditing(null); setAsJson(false); setMsg(m); void load() }} />
       </section>
     )
 
   return (
     <div className="stack" style={{ gap: 12 }}>
-      <p className="small muted">To add a survey, go to Collect → Import form and choose “Publish to everyone”.</p>
+      <p className="small muted">To add a survey, use Collect → Create form or Import form, then choose “Publish to everyone”.</p>
       {msg && <p className="note-ok">{msg}</p>}
       {forms.length === 0 && <p className="empty">No published surveys yet.</p>}
       {forms.map((f) => (

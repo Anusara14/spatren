@@ -358,3 +358,34 @@ Rules:
 - Write labels in clear English (add Sinhala/Tamil in brackets if I ask).
 
 My survey: `
+
+const builderSlug = (s: string) =>
+  s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').replace(/^(\d)/, 'q_$1').slice(0, 36) || 'q'
+
+// Readable, stable ids for CSV columns: derived from labels at save time; skip-logic references follow.
+export function finaliseForm(def: FormDef): FormDef {
+  const used = new Set<string>()
+  const map = new Map<string, string>()
+  for (const q of flatQuestions(def)) {
+    let id = /^q_[a-z0-9]+$/.test(q.id) && q.label.trim() ? builderSlug(q.label) : q.id
+    let unique = id
+    for (let n = 2; used.has(unique); n++) unique = `${id}_${n}`
+    used.add(unique)
+    map.set(q.id, unique)
+  }
+  return {
+    ...def,
+    title: def.title.trim(),
+    sections: def.sections.map((s) => ({
+      ...s,
+      questions: s.questions.map((q) => ({
+        ...q,
+        id: map.get(q.id)!,
+        label: q.label.trim(),
+        options: q.options?.map((o) => o.trim()).filter(Boolean),
+        show_if: q.show_if ? { ...q.show_if, question: map.get(q.show_if.question) ?? q.show_if.question } : undefined,
+      })),
+    })),
+  }
+}
+

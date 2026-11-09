@@ -16,12 +16,14 @@ export interface FormRow {
 interface Props {
   form: FormRow
   onClose: (saved: boolean) => void
+  /** try a form without saving a response or a draft */
+  preview?: boolean
 }
 
 type GpsAnswer = { lat: number; lng: number; accuracy: number }
 const draftKey = (id: string) => `spatren.draft.${id}`
 
-export default function FormRunner({ form, onClose }: Props) {
+export default function FormRunner({ form, onClose, preview = false }: Props) {
   const all = useMemo(() => flatQuestions(form.definition), [form])
   const sectionOf = useMemo(() => {
     const m = new Map<string, string>()
@@ -29,6 +31,7 @@ export default function FormRunner({ form, onClose }: Props) {
     return m
   }, [form])
   const [answers, setAnswers] = useState<Answers>(() => {
+    if (preview) return {}
     try {
       return JSON.parse(localStorage.getItem(draftKey(form.id)) ?? '{}') as Answers
     } catch {
@@ -47,8 +50,8 @@ export default function FormRunner({ form, onClose }: Props) {
 
   // Text answers survive an accidental close or reload (media blobs are kept in memory only).
   useEffect(() => {
-    localStorage.setItem(draftKey(form.id), JSON.stringify(answers))
-  }, [answers, form.id])
+    if (!preview) localStorage.setItem(draftKey(form.id), JSON.stringify(answers))
+  }, [answers, form.id, preview])
 
   const set = (id: string, v: Answer) => {
     setError(null)
@@ -66,6 +69,7 @@ export default function FormRunner({ form, onClose }: Props) {
   }
 
   async function submit() {
+    if (preview) return onClose(false)
     setSaving(true)
     const gpsQ = visible.find((x) => x.type === 'gps' && answers[x.id])
     const loc = (gpsQ ? answers[gpsQ.id] : await currentFix(8000)) as GpsAnswer | null
@@ -103,7 +107,7 @@ export default function FormRunner({ form, onClose }: Props) {
       <header className="runner-top">
         <button className="glass-btn sm" aria-label="Close survey (answers are kept as a draft)" onClick={() => onClose(false)}><IconClose /></button>
         <div className="grow">
-          <div className="runner-meta"><span>{form.title}</span><span className="tnum">{Math.min(step + 1, visible.length)} / {visible.length}</span></div>
+          <div className="runner-meta"><span>{preview ? `Preview · ${form.title}` : form.title}</span><span className="tnum">{Math.min(step + 1, visible.length)} / {visible.length}</span></div>
           <div className="runner-bar"><div style={{ transform: `scaleX(${atReview ? 1 : progress})` }} /></div>
         </div>
       </header>
@@ -133,7 +137,7 @@ export default function FormRunner({ form, onClose }: Props) {
       <footer className="runner-foot">
         <button className="btn btn-ghost" onClick={() => setStep((s) => Math.max(0, s - 1))} disabled={step === 0}>Back</button>
         {atReview ? (
-          <button className="btn btn-lime grow" onClick={() => void submit()} disabled={saving}>{saving ? 'Saving…' : 'Submit response'}</button>
+          <button className="btn btn-lime grow" onClick={() => void submit()} disabled={saving}>{preview ? 'End preview' : saving ? 'Saving…' : 'Submit response'}</button>
         ) : (
           <button className="btn btn-primary grow" onClick={next}>{step === visible.length - 1 ? 'Review' : q.required ? 'Next' : isAnsweredLocal(q, answers, media) ? 'Next' : 'Skip'}</button>
         )}

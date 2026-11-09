@@ -1,18 +1,20 @@
 import type { Session } from '@supabase/supabase-js'
-import { useCallback, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { requestPersistence } from './lib/db'
 import { supabase, type Profile } from './lib/supabase'
 import { syncNow } from './lib/sync'
 import { startTracking, wasTracking } from './lib/tracking'
-import Admin from './ui/Admin'
-import Collect from './ui/Collect'
 import Claim from './ui/Claim'
 import Field from './ui/Field'
 import { IconChart, IconField, IconPlus } from './ui/icons'
 import Login from './ui/Login'
 import { Mark } from './ui/Theme'
-import FormRunner from './ui/FormRunner'
-import { SAMPLE_FORM } from './lib/forms'
+
+// Code-split: the map engine, Collect and Admin load on first use (all precached by the service worker for offline).
+const Admin = lazy(() => import('./ui/Admin'))
+const Collect = lazy(() => import('./ui/Collect'))
+const FormRunner = lazy(() => import('./ui/FormRunner'))
+const loadSample = () => import('./lib/forms').then((m) => m.SAMPLE_FORM)
 
 type Tab = 'field' | 'collect' | 'admin'
 const PROFILE_CACHE = 'spatren.profile'
@@ -58,7 +60,7 @@ export default function App() {
     return () => clearInterval(retry)
   }, [profile?.status])
 
-  if (import.meta.env.DEV && location.hash.endsWith('-preview')) return <div className="main wide"><DevPreview /></div>
+  if (import.meta.env.DEV && location.hash.endsWith('-preview')) return <div className="main wide"><Suspense fallback={null}><DevPreview /></Suspense></div>
   if (session === undefined) return <Splash />
   // With no session but a cached profile (offline, token expired) collection continues locally; uploads wait for sign-in.
   if (!session && !profile) return <Login />
@@ -85,21 +87,29 @@ export default function App() {
           ))}
       </nav>
       <main className={`main ${tab === 'field' ? 'wide' : ''}`}>
+        <Suspense fallback={<div className="loading-pane" aria-busy="true" />}>
         {tab === 'field' && <Field profile={profile} onRecord={() => setTab('collect')} onProfileChange={() => void loadProfile()} />}
         {tab === 'collect' && <Collect isAdmin={profile.is_admin} />}
         {tab === 'admin' && profile.is_admin && <Admin />}
+        </Suspense>
       </main>
     </div>
   )
 }
 
 // Dev-only: preview the real screens without signing in.
+function RunnerPreview() {
+  const [def, setDef] = useState<Awaited<ReturnType<typeof loadSample>> | null>(null)
+  useEffect(() => void loadSample().then(setDef), [])
+  return def ? <FormRunner form={{ id: 'demo', title: def.title, version: 1, definition: def }} onClose={() => undefined} /> : null
+}
+
 function DevPreview() {
   const fake: Profile = { index_no: '242343J', full_name: 'Ranasinghe W.K.Y.A', nickname: 'Anusara', grp: 'Group 3', subgroup: 'Cultural', elective: 'Land Use', is_admin: true, status: 'approved', tracking: false, avatar: 'Felix' }
   const h = location.hash
   if (h === '#collect-preview') return <div className="main"><Collect isAdmin /></div>
   if (h === '#admin-preview') return <div className="main"><Admin /></div>
-  if (h === '#runner-preview') return <FormRunner form={{ id: 'demo', title: SAMPLE_FORM.title, version: 1, definition: SAMPLE_FORM }} onClose={() => undefined} />
+  if (h === '#runner-preview') return <RunnerPreview />
   return <Field profile={fake} onRecord={() => undefined} onProfileChange={() => undefined} />
 }
 

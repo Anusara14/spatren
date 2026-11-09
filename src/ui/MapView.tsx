@@ -1,3 +1,4 @@
+import 'maplibre-gl/dist/maplibre-gl.css'
 import { Map as MlMap, Marker, type GeoJSONSource, type LayerSpecification } from 'maplibre-gl'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { DISTRICT_BOUNDS } from '../lib/geo'
@@ -17,6 +18,8 @@ export interface MapMarker {
   label: string
   className?: string
   title?: string
+  /** shown above the mini person when zoomed in */
+  name?: string
   /** avatar image URL shown inside the pin */
   avatar?: string | null
 }
@@ -89,6 +92,12 @@ export default function MapView({
       if (pendingTrail.current) setTrailData(m, pendingTrail.current)
     })
     m.on('click', (e) => onPickRef.current?.({ lat: e.lngLat.lat, lng: e.lngLat.lng }))
+    const bucket = () => (m.getZoom() < 14 ? 'far' : m.getZoom() < 16 ? 'mid' : 'near')
+    el.current.dataset.zoom = bucket()
+    m.on('zoom', () => {
+      const b = bucket()
+      if (el.current && el.current.dataset.zoom !== b) el.current.dataset.zoom = b
+    })
     m.on('move', () => {
       const c = m.getCenter()
       onCenterRef.current?.({ lat: c.lat, lng: c.lng })
@@ -132,7 +141,8 @@ export default function MapView({
     })
   }, [meetingPoints])
 
-  // Team markers: add / move / restyle / remove.
+  // Team markers: add / move / restyle / remove. Each pin carries three looks (dot · head · mini person);
+  // CSS picks one from the map's zoom bucket, so zooming never touches React or the DOM tree.
   useEffect(() => {
     const m = map.current
     if (!m) return
@@ -142,7 +152,8 @@ export default function MapView({
       let pin = pins.current.get(mk.id)
       if (!pin) {
         const node = document.createElement('div')
-        node.appendChild(document.createElement('span'))
+        node.innerHTML =
+          '<span class="mk-dot"></span><span class="mk-person"><span class="mk-name"></span><span class="mk-head"></span><span class="mk-body"></span><span class="mk-shadow"></span></span>'
         node.addEventListener('click', (e) => {
           e.stopPropagation()
           onSelectRef.current?.(mk.id)
@@ -152,22 +163,25 @@ export default function MapView({
       }
       pin.setLngLat([mk.lng, mk.lat])
       const node = pin.getElement()
-      node.className = `mk ${mk.className ?? ''} ${selectedId === mk.id ? 'sel' : ''}`
+      const cls = `mk ${mk.className ?? ''} ${selectedId === mk.id ? 'sel' : ''}`
+      if (node.className !== cls) node.className = cls
       node.style.setProperty('--c', mk.color)
       node.title = mk.title ?? mk.label
-      const slot = node.firstElementChild as HTMLElement
+      const name = node.querySelector('.mk-name') as HTMLElement
+      if (name.textContent !== (mk.name ?? mk.label)) name.textContent = mk.name ?? mk.label
+      const head = node.querySelector('.mk-head') as HTMLElement
       if (mk.avatar) {
-        let img = slot.querySelector('img')
+        let img = head.querySelector('img')
         if (!img) {
-          slot.textContent = ''
+          head.textContent = ''
           img = document.createElement('img')
           img.alt = ''
+          img.decoding = 'async'
           img.referrerPolicy = 'no-referrer'
-          slot.appendChild(img)
+          head.appendChild(img)
         }
-        if (img.src !== mk.avatar) img.src = mk.avatar
-        node.classList.add('has-avatar')
-      } else slot.textContent = mk.label
+        if (img.getAttribute('src') !== mk.avatar) img.src = mk.avatar
+      } else if (head.textContent !== mk.label) head.textContent = mk.label
     }
     for (const [id, pin] of pins.current) {
       if (!seen.has(id)) {

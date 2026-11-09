@@ -6,14 +6,15 @@ import { clock } from '../lib/geo'
 import { supabase } from '../lib/supabase'
 import { syncNow, useOnline } from '../lib/sync'
 import Capture from './Capture'
+import FormBuilder from './FormBuilder'
 import FormImport, { localForms, removeLocalForm } from './FormImport'
 import FormRunner, { type FormRow } from './FormRunner'
-import { IconBack, IconCheckCircle, IconChevrons, IconDownload, IconFilePlus, IconNote, IconPencil, IconTrash, IconUpload } from './icons'
-import { Mark, ThemeToggle } from './Theme'
+import { IconBack, IconCheckCircle, IconChevrons, IconDownload, IconFilePlus, IconFormEdit, IconNote, IconPencil, IconTrash, IconUpload } from './icons'
+import { Mark } from './Theme'
 
 const FORMS_CACHE = 'spatren.forms'
 const draftKey = (id: string) => `spatren.draft.${id}`
-type View = 'home' | 'start' | 'drafts' | 'ready' | 'sent' | 'import' | 'quick'
+type View = 'home' | 'start' | 'drafts' | 'ready' | 'sent' | 'import' | 'quick' | 'build'
 
 function cachedForms(): FormRow[] {
   try {
@@ -37,6 +38,7 @@ export default function Collect({ isAdmin }: { isAdmin: boolean }) {
   const [records, setRecords] = useState<LocalRecord[]>([])
   const [toast, setToast] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
+  const [editing, setEditing] = useState<FormRow | null>(null)
   const online = useOnline()
 
   useEffect(() => {
@@ -92,6 +94,16 @@ export default function Collect({ isAdmin }: { isAdmin: boolean }) {
       />
     )
   if (view === 'quick') return <Capture onBack={() => setView('home')} />
+  if (view === 'build')
+    return (
+      <FormBuilder
+        isAdmin={isAdmin}
+        initial={editing?.definition}
+        localId={editing?.id}
+        onCancel={() => { setEditing(null); setView(editing ? 'start' : 'home') }}
+        onDone={(m) => { setToast(m); setEditing(null); setLocal(localForms()); setView('start') }}
+      />
+    )
 
   const back = (title: string, extra?: ReactNode) => (
     <header className="kc-sub">
@@ -118,6 +130,7 @@ export default function Collect({ isAdmin }: { isAdmin: boolean }) {
 
           <nav className="kc-menu" aria-label="Collect">
             <MenuItem icon={<IconFilePlus />} title="Start new form" sub={`${forms.length} form${forms.length === 1 ? '' : 's'} available`} onClick={() => setView('start')} accent />
+            <MenuItem icon={<IconFormEdit />} title="Create form" sub="Build questions, photo, voice, location and rules" onClick={() => { setEditing(null); setView('build') }} />
             <MenuItem icon={<IconPencil />} title="Drafts" sub="Continue unfinished forms" count={drafts.length} onClick={() => setView('drafts')} />
             <MenuItem icon={<IconUpload />} title="Ready to send" sub={ready.length ? 'Finalised, waiting to upload' : 'Nothing waiting'} count={ready.length} warn={ready.length > 0} onClick={() => setView('ready')} />
             <MenuItem icon={<IconCheckCircle />} title="Sent" sub="Uploaded from this phone" count={sent.length} onClick={() => setView('sent')} />
@@ -125,10 +138,6 @@ export default function Collect({ isAdmin }: { isAdmin: boolean }) {
             <MenuItem icon={<IconNote />} title="Quick note" sub="Photo, voice and notes without a form" onClick={() => setView('quick')} />
           </nav>
 
-          <section className="stack" style={{ gap: 8 }}>
-            <h2 className="section-title">Appearance</h2>
-            <ThemeToggle />
-          </section>
         </>
       )}
 
@@ -145,6 +154,9 @@ export default function Collect({ isAdmin }: { isAdmin: boolean }) {
                   {hasDraft(f.id) ? ' · draft saved' : ''}
                 </span>
               </button>
+              {f.id.startsWith('local-') && (
+                <button className="glass-btn sm" aria-label={`Edit ${f.title}`} onClick={() => { setEditing(f); setView('build') }}><IconPencil /></button>
+              )}
               {f.id.startsWith('local-') && (
                 <button className="glass-btn sm" aria-label={`Delete ${f.title} from this phone`} onClick={() => {
                   if (!confirm(`Remove “${f.title}” from this phone? Responses already finalised are kept.`)) return

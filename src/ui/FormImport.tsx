@@ -23,10 +23,19 @@ export function removeLocalForm(id: string): void {
   localStorage.setItem(LOCAL_KEY, JSON.stringify(localForms().filter((f) => f.id !== id)))
 }
 
-function saveLocal(def: FormDef): FormRow {
-  const row: FormRow = { id: `local-${crypto.randomUUID()}`, title: def.title, version: 1, definition: def }
-  localStorage.setItem(LOCAL_KEY, JSON.stringify([row, ...localForms()]))
+export function saveLocalForm(def: FormDef, id?: string): FormRow {
+  const existing = id ? localForms().find((f) => f.id === id) : undefined
+  const row: FormRow = { id: existing?.id ?? `local-${crypto.randomUUID()}`, title: def.title, version: (existing?.version ?? 0) + 1, definition: def }
+  localStorage.setItem(LOCAL_KEY, JSON.stringify([row, ...localForms().filter((f) => f.id !== row.id)]))
   return row
+}
+
+/** Publish a new team form, or a new version of an existing one. Returns an error message or null. */
+export async function publishForm(def: FormDef, replacing?: { id: string; version: number } | null): Promise<string | null> {
+  const { error } = replacing
+    ? await supabase.from('forms').update({ title: def.title, definition: def, version: replacing.version + 1, updated_at: new Date().toISOString() }).eq('id', replacing.id)
+    : await supabase.from('forms').insert({ title: def.title, definition: def })
+  return error ? (navigator.onLine ? error.message : 'you are offline') : null
 }
 
 interface Props {
@@ -73,17 +82,15 @@ export default function FormImport({ isAdmin, replacing = null, onDone, onCancel
     if (!parsed?.form) return
     setBusy(true)
     const f = parsed.form
-    const { error } = replacing
-      ? await supabase.from('forms').update({ title: f.title, definition: f, version: replacing.version + 1, updated_at: new Date().toISOString() }).eq('id', replacing.id)
-      : await supabase.from('forms').insert({ title: f.title, definition: f })
+    const error = await publishForm(f, replacing)
     setBusy(false)
-    if (error) return setMsg(`Couldn't publish: ${navigator.onLine ? error.message : 'you are offline'}. You can save it to this phone instead.`)
+    if (error) return setMsg(`Couldn't publish: ${error}. You can save it to this phone instead.`)
     onDone(replacing ? `Updated “${f.title}” to version ${replacing.version + 1}.` : `Published “${f.title}” to everyone's phone.`)
   }
 
   function keepLocal() {
     if (!parsed?.form) return
-    saveLocal(parsed.form)
+    saveLocalForm(parsed.form)
     onDone(`Saved “${parsed.form.title}” on this phone. Find it under Start new form.`)
   }
 

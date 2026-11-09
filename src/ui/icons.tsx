@@ -83,3 +83,9 @@ export const IconBack = (p: P) => (
 export const IconTrash = (p: P) => (
   <svg {...base} {...p}><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" /></svg>
 )
+export const IconFlag = (p: P) => (
+  <svg {...base} {...p}><path d="M5 21V4M5 4h11l-2 4 2 4H5" /></svg>
+)
+export const IconFormEdit = (p: P) => (
+  <svg {...base} {...p}><rect x="4" y="3" width="13" height="18" rx="2.5" /><path d="M8 8h5M8 12h3" /><path d="m14 18 6-6 2 2-6 6h-2Z" /></svg>
+)
