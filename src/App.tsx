@@ -7,15 +7,14 @@ import { startTracking, wasTracking } from './lib/tracking'
 import Admin from './ui/Admin'
 import Collect from './ui/Collect'
 import Claim from './ui/Claim'
-import Control from './ui/Control'
 import Field from './ui/Field'
-import { IconChart, IconField, IconPlus, IconRadar } from './ui/icons'
+import { IconChart, IconField, IconPlus } from './ui/icons'
 import Login from './ui/Login'
 import { Mark } from './ui/Theme'
 import FormRunner from './ui/FormRunner'
 import { SAMPLE_FORM } from './lib/forms'
 
-type Tab = 'field' | 'collect' | 'control' | 'admin'
+type Tab = 'field' | 'collect' | 'admin'
 const PROFILE_CACHE = 'spatren.profile'
 
 function cachedProfile(): Profile | null {
@@ -67,9 +66,8 @@ export default function App() {
   if (!profile || profile.status !== 'approved') return <Claim profile={profile ?? null} onDone={loadProfile} />
 
   const tabs: { id: Tab; label: string; icon: JSX.Element; admin?: boolean }[] = [
-    { id: 'field', label: 'Field', icon: <IconField /> },
+    { id: 'field', label: 'Map', icon: <IconField /> },
     { id: 'collect', label: 'Collect', icon: <IconPlus /> },
-    { id: 'control', label: 'Live map', icon: <IconRadar />, admin: true },
     { id: 'admin', label: 'Admin', icon: <IconChart />, admin: true },
   ]
 
@@ -86,10 +84,9 @@ export default function App() {
             </button>
           ))}
       </nav>
-      <main className={`main ${tab === 'control' || tab === 'field' ? 'wide' : ''}`}>
-        {tab === 'field' && <Field profile={profile} onRecord={() => setTab('collect')} />}
+      <main className={`main ${tab === 'field' ? 'wide' : ''}`}>
+        {tab === 'field' && <Field profile={profile} onRecord={() => setTab('collect')} onProfileChange={() => void loadProfile()} />}
         {tab === 'collect' && <Collect isAdmin={profile.is_admin} />}
-        {tab === 'control' && profile.is_admin && <Control />}
         {tab === 'admin' && profile.is_admin && <Admin />}
       </main>
     </div>
@@ -98,13 +95,12 @@ export default function App() {
 
 // Dev-only: preview the real screens without signing in.
 function DevPreview() {
-  const fake: Profile = { index_no: '242343J', full_name: 'Ranasinghe W.K.Y.A', nickname: 'Anusara', grp: 'Group 3', subgroup: 'Cultural', elective: 'Land Use', is_admin: true, status: 'approved', tracking: false }
+  const fake: Profile = { index_no: '242343J', full_name: 'Ranasinghe W.K.Y.A', nickname: 'Anusara', grp: 'Group 3', subgroup: 'Cultural', elective: 'Land Use', is_admin: true, status: 'approved', tracking: false, avatar: 'Felix' }
   const h = location.hash
-  if (h === '#control-preview') return <Control />
   if (h === '#collect-preview') return <div className="main"><Collect isAdmin /></div>
   if (h === '#admin-preview') return <div className="main"><Admin /></div>
   if (h === '#runner-preview') return <FormRunner form={{ id: 'demo', title: SAMPLE_FORM.title, version: 1, definition: SAMPLE_FORM }} onClose={() => undefined} />
-  return <Field profile={fake} onRecord={() => undefined} />
+  return <Field profile={fake} onRecord={() => undefined} onProfileChange={() => undefined} />
 }
 
 function Splash() {

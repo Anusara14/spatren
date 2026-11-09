@@ -35,6 +35,11 @@ export default defineConfig({
             options: { cacheName: 'map-tiles', expiration: { maxEntries: 4000, maxAgeSeconds: 60 * 60 * 24 * 30 } },
           },
           {
+            urlPattern: /^https:\/\/api\.dicebear\.com\//,
+            handler: 'CacheFirst',
+            options: { cacheName: 'avatars', expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 60 } },
+          },
+          {
             urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\//,
             handler: 'CacheFirst',
             options: { cacheName: 'fonts', expiration: { maxEntries: 20 } },

@@ -11,7 +11,7 @@ const MESSAGES: Record<string, string> = {
   invalid_format: 'Index numbers look like 242343J: six digits and a capital letter.',
   not_in_roster: "That index isn't on the L2S4 class list. Check it, or ask the class rep.",
   already_claimed: 'That index is already linked to another Google account. Ask the class rep to reset it.',
-  pending: "Thanks. Your name didn't match the class list exactly, so the class rep will approve you shortly.",
+  pending: 'Thanks. The class rep will approve you shortly. Tap Check approval status in a minute.',
 }
 
 export default function Claim({ profile, onDone }: ClaimProps) {
@@ -61,8 +61,9 @@ export default function Claim({ profile, onDone }: ClaimProps) {
           />
         </div>
         <div className="field">
-          <label htmlFor="sn">Your surname (as on the class list) or your nickname</label>
-          <input id="sn" className="input" placeholder="e.g. Ranasinghe or Anusara" value={surname} onChange={(e) => setSurname(e.target.value)} required />
+          <label htmlFor="sn">Surname or nickname <span className="muted" style={{ fontWeight: 400 }}>(optional)</span></label>
+          <input id="sn" className="input" placeholder="e.g. Ranasinghe or Anusara" value={surname} onChange={(e) => setSurname(e.target.value)} />
+          <p className="small muted">Adding it gets you approved instantly. Without it, the class rep approves you.</p>
         </div>
         {msg && <p className="small card-flat">{msg}</p>}
         <button className="btn btn-primary btn-block" disabled={busy || index.length < 7}>

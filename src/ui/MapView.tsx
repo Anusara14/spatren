@@ -1,5 +1,5 @@
 import { Map as MlMap, Marker, type GeoJSONSource, type LayerSpecification } from 'maplibre-gl'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { DISTRICT_BOUNDS } from '../lib/geo'
 import type { MeetingPoint } from '../lib/meeting'
 import { useTheme, type Theme } from '../lib/theme'
@@ -17,6 +17,8 @@ export interface MapMarker {
   label: string
   className?: string
   title?: string
+  /** avatar image URL shown inside the pin */
+  avatar?: string | null
 }
 
 interface MapViewProps {
@@ -34,10 +36,14 @@ interface MapViewProps {
   controls?: boolean
   /** bottom offset of the floating zoom controls, CSS length */
   controlsBottom?: string
+  /** rendered at the top of the floating control stack (e.g. SOS) */
+  topControl?: ReactNode
+  /** crosshair mode: reports the map centre as the user pans */
+  onCenter?: ((c: { lat: number; lng: number }) => void) | null
 }
 
 export default function MapView({
-  markers = [], selectedId, onSelect, trail, me, focus, pitch = 58, meetingPoints = [], onMeetingClick, onPick = null, controls = true, controlsBottom = '24px',
+  markers = [], selectedId, onSelect, trail, me, focus, pitch = 58, meetingPoints = [], onMeetingClick, onPick = null, controls = true, controlsBottom = '24px', topControl, onCenter = null,
 }: MapViewProps) {
   const el = useRef<HTMLDivElement>(null)
   const map = useRef<MlMap | null>(null)
@@ -45,6 +51,8 @@ export default function MapView({
   const mpPins = useRef<Marker[]>([])
   const onPickRef = useRef(onPick)
   onPickRef.current = onPick
+  const onCenterRef = useRef(onCenter)
+  onCenterRef.current = onCenter
   const onMeetingRef = useRef(onMeetingClick)
   onMeetingRef.current = onMeetingClick
   const meMarker = useRef<Marker | null>(null)
@@ -81,6 +89,10 @@ export default function MapView({
       if (pendingTrail.current) setTrailData(m, pendingTrail.current)
     })
     m.on('click', (e) => onPickRef.current?.({ lat: e.lngLat.lat, lng: e.lngLat.lng }))
+    m.on('move', () => {
+      const c = m.getCenter()
+      onCenterRef.current?.({ lat: c.lat, lng: c.lng })
+    })
     map.current = m
     if (import.meta.env.DEV) (window as unknown as { __map: MlMap }).__map = m
     const pinsMap = pins.current
@@ -143,7 +155,19 @@ export default function MapView({
       node.className = `mk ${mk.className ?? ''} ${selectedId === mk.id ? 'sel' : ''}`
       node.style.setProperty('--c', mk.color)
       node.title = mk.title ?? mk.label
-      node.firstElementChild!.textContent = mk.label
+      const slot = node.firstElementChild as HTMLElement
+      if (mk.avatar) {
+        let img = slot.querySelector('img')
+        if (!img) {
+          slot.textContent = ''
+          img = document.createElement('img')
+          img.alt = ''
+          img.referrerPolicy = 'no-referrer'
+          slot.appendChild(img)
+        }
+        if (img.src !== mk.avatar) img.src = mk.avatar
+        node.classList.add('has-avatar')
+      } else slot.textContent = mk.label
     }
     for (const [id, pin] of pins.current) {
       if (!seen.has(id)) {
@@ -193,8 +217,14 @@ export default function MapView({
   return (
     <>
       <div ref={el} className={`map ${onPick ? 'picking' : ''}`} />
+      {onCenter && (
+        <div className="crosshair" aria-hidden="true">
+          <span className="meet-flag" />
+        </div>
+      )}
       {controls && (
         <div className="map-ctrls" style={{ bottom: controlsBottom }}>
+          {topControl}
           <button className="glass-btn" aria-label="Zoom in" onClick={() => map.current?.zoomIn()}><IconPlus2 /></button>
           <button className="glass-btn" aria-label="Zoom out" onClick={() => map.current?.zoomOut()}><IconMinus /></button>
           <button className="glass-btn" aria-pressed={tilted} aria-label={tilted ? 'Switch to flat view' : 'Switch to 3D view'} onClick={toggleTilt}>

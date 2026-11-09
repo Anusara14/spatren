@@ -18,12 +18,14 @@ export type Profile = {
   is_admin: boolean
   status: 'pending' | 'approved' | 'rejected'
   tracking: boolean
+  avatar: string | null
 }
 
 export type TeamRow = {
   index_no: string
   full_name: string
   nickname: string | null
+  avatar?: string | null
   grp: string
   subgroup: string
   elective: string | null
@@ -74,3 +76,10 @@ export type RecordRow = {
 /** What classmates call each other; falls back to the class-list name. */
 export const nameOf = (r: { nickname?: string | null; full_name?: string | null } | null | undefined): string =>
   r?.nickname || r?.full_name || 'Unknown student'
+
+/** Index-based login: students without Google get a private, never-emailed address derived from their index. */
+export const emailForIndex = (index: string): string => `${index.trim().toLowerCase()}@students.spatren.app`
+
+// DiceBear "Adventurer Neutral" by Lisa Wischofsky, CC BY 4.0 (https://www.dicebear.com/styles/adventurer-neutral)
+export const avatarUrl = (seed: string | null | undefined): string | null =>
+  seed ? `https://api.dicebear.com/9.x/adventurer-neutral/svg?seed=${encodeURIComponent(seed)}&radius=50` : null
