@@ -219,6 +219,10 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 button, a, [role='button'], .opt, .choice, .kc-item { touch-action: manipulation; } /* no double-tap zoom delay */
 /* no rubber-band behind the map. Not overflow:hidden: in an iPhone Home-Screen app that clips everything below a too-short viewport. */
 html:has(.immersive), body:has(.immersive) { overscroll-behavior: none; }
+/* iPhone Home-Screen apps shrink the screen by the status-bar height when the page can't scroll, so the map tab
+   (nothing to scroll) ended ~60pt early while scrolling tabs filled the screen. One status bar of extra height fixes
+   it; the map and tab bar are fixed, so the tiny scroll this allows moves nothing on screen. */
+html:has(.immersive) { min-height: calc(100% + env(safe-area-inset-top, 0px)); }
 .immersive, .dock, .map-ctrls, .tabbar { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .runner-body, .sheet, .panel { -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
 input, textarea, select { -webkit-user-select: text; user-select: text; }

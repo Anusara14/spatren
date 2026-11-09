@@ -240,14 +240,14 @@ a.btn { text-decoration: none; }
 :root[data-theme='dark'] .mk-name { background: rgba(230, 237, 242, 0.92); color: #0b1520; }
 :root[data-theme='dark'] .mk-dot, :root[data-theme='dark'] .mk-head, :root[data-theme='dark'] [data-zoom='near'] .mk-body { border-color: #0b1520; }
 
-/* Avatar picker shows only complete rows (~16): columns = floor((width + 8) / 72) for minmax(64px, 1fr) + 8px gap. */
+/* Avatar picker shows exactly two full rows: columns = floor((width + 8) / 72) for minmax(64px, 1fr) + 8px gap. */
 .avatar-wrap { container-type: inline-size; }
-.avatar-opt:nth-child(n + 17) { display: none; }
-@container (max-width: 279px) { .avatar-opt:nth-child(n + 16) { display: none; } }                        /* 3 cols → 15 */
-@container (min-width: 280px) and (max-width: 351px) { .avatar-opt:nth-child(n + 17) { display: none; } } /* 4 cols → 16 */
-@container (min-width: 352px) and (max-width: 423px) { .avatar-opt:nth-child(n + 16) { display: none; } } /* 5 cols → 15 */
-@container (min-width: 424px) and (max-width: 495px) { .avatar-opt:nth-child(-n + 18) { display: block; } .avatar-opt:nth-child(n + 19) { display: none; } } /* 6 cols → 18 */
-@container (min-width: 496px) { .avatar-opt:nth-child(n + 15) { display: none; } }                        /* 7 cols → 14 */
+.avatar-opt:nth-child(n + 11) { display: none; }
+@container (max-width: 279px) { .avatar-opt:nth-child(n + 7) { display: none; } }                          /* 3 cols → 6 */
+@container (min-width: 280px) and (max-width: 351px) { .avatar-opt:nth-child(n + 9) { display: none; } }  /* 4 cols → 8 */
+@container (min-width: 352px) and (max-width: 423px) { .avatar-opt:nth-child(n + 11) { display: none; } } /* 5 cols → 10 */
+@container (min-width: 424px) and (max-width: 495px) { .avatar-opt:nth-child(-n + 12) { display: block; } .avatar-opt:nth-child(n + 13) { display: none; } } /* 6 cols → 12 */
+@container (min-width: 496px) { .avatar-opt:nth-child(-n + 14) { display: block; } .avatar-opt:nth-child(n + 15) { display: none; } } /* 7 cols → 14 */
 
 /* Lime flag must beat the dark-theme glass rule. */
 .glass-btn.pin-btn, :root[data-theme='dark'] 
