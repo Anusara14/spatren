@@ -122,7 +122,7 @@ export default function Field({ profile, onRecord, onProfileChange }: FieldProps
         meetingPoints={meeting}
         onMeetingClick={(m) => { setDismissed((d) => d.filter((x) => x !== m.id)); show(m.lat, m.lng) }}
         onCenter={picking ? (c) => { pickCenter.current = c } : null}
-        controlsBottom="calc(164px + var(--tab-b))"
+        controlsBottom="calc(178px + var(--tab-b))"
         topControl={
           <>
             <Sos name={`${nameOf(profile)} (${profile.index_no ?? ''})`} variant="fab" />

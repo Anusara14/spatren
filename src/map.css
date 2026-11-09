@@ -88,7 +88,7 @@ a.btn { text-decoration: none; }
 .sos .fill { transform: scaleX(var(--p, 0)); }
 
 .map-toast {
-  position: absolute; z-index: 6; left: 16px; right: 16px; bottom: calc(164px + var(--tab-b)); max-width: 420px;
+  position: absolute; z-index: 6; left: 16px; right: 16px; bottom: calc(178px + var(--tab-b)); max-width: 420px;
   padding: 12px 16px; border-radius: var(--r-md); background: var(--navy); color: #fff; font-size: 14px; box-shadow: var(--shadow-lg);
 }
 
