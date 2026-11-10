@@ -4,7 +4,7 @@ const config: CapacitorConfig = {
   appId: 'lk.spatren.field',
   appName: 'SPATREN',
   webDir: 'dist',
-  android: { backgroundColor: '#0b1520' },
+  android: { backgroundColor: '#000000' },
   plugins: { LocalNotifications: { iconColor: '#BED43D' } },
 }
 

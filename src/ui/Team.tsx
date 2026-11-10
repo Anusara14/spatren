@@ -53,7 +53,7 @@ export default function Team() {
       <form className="card stack" onSubmit={saveSettings}>
         <h2 className="section-title" style={{ margin: 0 }}>Emergency contact</h2>
         <p className="small muted">Students see this when an SOS can't reach the server, as an SMS and call button. Use a phone that is with you in the field.</p>
-        <input className="input" placeholder="Name, e.g. Class rep" value={name} onChange={(e) => setName(e.target.value)} />
+        <input className="input" placeholder="Name, e.g. Admin" value={name} onChange={(e) => setName(e.target.value)} />
         <input className="input tnum" placeholder="+94 7X XXX XXXX" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
         <button className="btn btn-primary">{saved ? 'Saved' : 'Save contact'}</button>
       </form>

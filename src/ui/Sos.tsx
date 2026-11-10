@@ -140,10 +140,10 @@ export default function Sos({ name, variant = 'bar' }: SosProps) {
             {phone ? (
               <div className="row">
                 <a className="btn btn-danger grow" href={`sms:${phone}?&body=${encodeURIComponent(smsBody)}`}>Send SMS</a>
-                <a className="btn btn-ghost grow" href={`tel:${phone}`}>Call {coord?.coordinator_name ?? 'coordinator'}</a>
+                <a className="btn btn-ghost grow" href={`tel:${phone}`}>Call {coord?.coordinator_name ?? 'admin'}</a>
               </div>
             ) : (
-              <p className="small card-flat">No coordinator number is set yet. Ask your class rep to add it in Team → Settings.</p>
+              <p className="small card-flat">No emergency number is set yet. Ask the admin to add it in Admin → People & settings.</p>
             )}
             <a className="btn btn-ghost" href="tel:119">Call 119 (Police emergency)</a>
             <button className="btn btn-ghost" onClick={() => setOutcome(null)}>Close</button>

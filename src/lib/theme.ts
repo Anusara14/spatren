@@ -22,7 +22,7 @@ const resolve = (): Theme => (pref === 'system' ? (media.matches ? 'dark' : 'lig
 function apply(): void {
   const t = resolve()
   document.documentElement.dataset.theme = t
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', t === 'dark' ? '#0E1A26' : '#13283C')
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', t === 'dark' ? '#000000' : '#13283C')
   listeners.forEach((l) => l())
 }
 

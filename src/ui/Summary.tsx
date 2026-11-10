@@ -19,7 +19,14 @@ const dayBounds = (day: string): [string, string] => {
 }
 const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
-export default function Summary() {
+/** Text survey answers for the word cloud (skips file paths, links and numbers). */
+function answerWords(r: RecordRow): string {
+  const a = (r.data?.answers ?? {}) as Record<string, unknown>
+  return Object.values(a).filter((v): v is string => typeof v === 'string' && /\p{L}/u.test(v) && !/^(https?:|device:)|\//.test(v)).join(' ')
+}
+
+/** Admin: the whole class. Student: their own records only (the database only returns their own rows anyway). */
+export default function Summary({ isAdmin = true }: { isAdmin?: boolean }) {
   const [day, setDay] = useState(localDay())
   const [team, setTeam] = useState<TeamRow[]>([])
   const [records, setRecords] = useState<RecordRow[]>([])
@@ -31,11 +38,12 @@ export default function Summary() {
   const load = useCallback(async () => {
     setLoading(true)
     const [from, to] = dayBounds(day)
+    const none = Promise.resolve({ data: null })
     const [t, r, a, s] = await Promise.all([
-      supabase.from('team_status').select('*'),
+      isAdmin ? supabase.from('team_status').select('*') : none,
       supabase.from('records').select('*').gte('recorded_at', from).lt('recorded_at', to).order('recorded_at'),
-      supabase.rpc('activity_between', { p_from: from, p_to: to }),
-      supabase.from('sos_alerts').select('*').gte('created_at', from).lt('created_at', to),
+      isAdmin ? supabase.rpc('activity_between', { p_from: from, p_to: to }) : none,
+      isAdmin ? supabase.from('sos_alerts').select('*').gte('created_at', from).lt('created_at', to) : none,
     ])
     const recs = (r.data ?? []) as RecordRow[]
     setTeam((t.data ?? []) as TeamRow[])
@@ -49,7 +57,7 @@ export default function Summary() {
       const { data } = await supabase.storage.from('media').createSignedUrls(imgs.map((i) => i.path), 3600)
       setPhotos((data ?? []).flatMap((d, i) => (d.signedUrl ? [{ url: d.signedUrl, rec: imgs[i].rec }] : [])))
     } else setPhotos([])
-  }, [day])
+  }, [day, isAdmin])
 
   useEffect(() => void load(), [load])
 
@@ -62,6 +70,7 @@ export default function Summary() {
       active: activity.length,
       records: records.length,
       interviews: records.filter((r) => r.kind === 'interview').length,
+      surveys: records.filter((r) => r.kind === 'survey').length,
       photos: media.filter((m) => m.type.startsWith('image')).length,
       audio: media.filter((m) => m.type.startsWith('audio')).length,
       sos: sos.length,
@@ -80,13 +89,14 @@ export default function Summary() {
   })
   const byCategory = countBy(records.map((r) => r.category || r.kind))
   const bySubgroup = countBy(records.map((r) => userGroup.get(r.user_id)?.subgroup ?? 'Unknown'))
+  const byForm = countBy(records.filter((r) => r.kind === 'survey').map((r) => String(r.data?.form_title ?? 'Untitled form')))
   const hours = Array.from({ length: 24 }, (_, h) => records.filter((r) => new Date(r.recorded_at).getHours() === h).length)
   const firstHour = Math.max(0, hours.findIndex((n) => n > 0) - 1)
   const lastHour = Math.min(23, 23 - [...hours].reverse().findIndex((n) => n > 0) + 1)
   const shownHours = records.length ? hours.slice(firstHour, lastHour + 1) : hours.slice(7, 19)
   const hourStart = records.length ? firstHour : 7
   const maxHour = Math.max(1, ...shownHours)
-  const text = records.map((r) => `${r.title ?? ''} ${r.notes ?? ''}`).join(' ')
+  const text = records.map((r) => `${r.title ?? ''} ${r.notes ?? ''} ${answerWords(r)}`).join(' ')
 
   function exportCsv() {
     const head = ['id', 'recorded_at', 'kind', 'category', 'title', 'notes', 'lat', 'lng', 'accuracy', 'index_no', 'name', 'nickname', 'group', 'subgroup', 'elective', 'media']
@@ -135,6 +145,7 @@ export default function Summary() {
     <div className="stack" style={{ gap: 18, maxWidth: 1100, margin: '0 auto' }}>
       <header className="row between" style={{ flexWrap: 'wrap', gap: 12 }}>
         <div className="stack" style={{ gap: 4 }}>
+          <span className="eyebrow">{isAdmin ? 'Class summary' : 'My summary'}</span>
           <h1 style={{ fontSize: 28, letterSpacing: '-0.03em' }}>{new Date(`${day}T12:00:00`).toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' })}</h1>
         </div>
         <div className="row">
@@ -144,15 +155,17 @@ export default function Summary() {
       </header>
 
       <div className="kpi-grid">
-        <Kpi value={`${stats.active}/${team.length}`} label="Students in the field" />
+        {isAdmin ? <Kpi value={`${stats.active}/${team.length}`} label="Students in the field" /> : <Kpi value={stats.surveys} label="Surveys filled" />}
         <Kpi value={stats.records} label="Records collected" />
         <Kpi value={stats.interviews} label="Interviews" />
         <Kpi value={`${stats.photos} · ${stats.audio}`} label="Photos · audio clips" />
       </div>
       {stats.sos > 0 && <p className="card-flat" style={{ background: 'var(--danger-wash)', color: 'var(--danger)' }}><b>{stats.sos} SOS alert{stats.sos > 1 ? 's' : ''}</b> today: {sos.map((s) => `${nameOf(userGroup.get(s.user_id))} at ${clock(s.created_at)} (${s.status})`).join('; ')}</p>}
 
+      {!isAdmin && !loading && !records.length && <p className="empty">Nothing uploaded for this day yet. Fill a form or add a quick note in Collect, and it shows up here once it's sent.</p>}
+
       <div className="grid-2">
-        <section className="card stack">
+        {isAdmin && <section className="card stack">
           <h2 style={{ fontSize: 17 }}>Groups</h2>
           {byGroup.map((g) => (
             <div key={g.g} className="stack" style={{ gap: 6 }}>
@@ -163,7 +176,7 @@ export default function Summary() {
               <div className="bar-track"><div className="bar-fill" style={{ width: `${(g.active / Math.max(1, g.total)) * 100}%`, background: groupColor(g.g) }} /></div>
             </div>
           ))}
-        </section>
+        </section>}
 
         <section className="card stack">
           <h2 style={{ fontSize: 17 }}>Activity by hour</h2>
@@ -179,15 +192,20 @@ export default function Summary() {
         </section>
 
         <section className="card stack">
+          <h2 style={{ fontSize: 17 }}>Forms filled</h2>
+          <Bars data={byForm} />
+        </section>
+
+        {isAdmin && <section className="card stack">
           <h2 style={{ fontSize: 17 }}>By research theme</h2>
           <Bars data={bySubgroup} />
-        </section>
+        </section>}
       </div>
 
       <section className="card stack">
         <div className="row between">
-          <h2 style={{ fontSize: 17 }}>Words from today's notes</h2>
-          <span className="small muted">titles + notes · Sinhala/Tamil words included as typed</span>
+          <h2 style={{ fontSize: 17 }}>Most used words</h2>
+          <span className="small muted">from notes and survey answers</span>
         </div>
         <WordCloud text={text} />
       </section>
@@ -211,7 +229,7 @@ export default function Summary() {
         <div className="row" style={{ flexWrap: 'wrap' }}>
           <button className="btn btn-primary btn-sm" onClick={exportCsv} disabled={!records.length}>Records CSV</button>
           <button className="btn btn-lime btn-sm" onClick={exportGeoJson} disabled={!records.length}>Records GeoJSON</button>
-          <button className="btn btn-ghost btn-sm" onClick={() => void exportTracks()}>GPS tracks CSV</button>
+          {isAdmin && <button className="btn btn-ghost btn-sm" onClick={() => void exportTracks()}>GPS tracks CSV</button>}
         </div>
       </section>
     </div>

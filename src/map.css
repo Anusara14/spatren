@@ -237,8 +237,8 @@ a.btn { text-decoration: none; }
 .mk.mk-sos { --c: var(--danger); opacity: 1; filter: none; }
 .mk.mk-sos .mk-head, .mk.mk-sos .mk-dot { animation: sos-ring 0.9s ease-out infinite; }
 @keyframes sos-ring { from { box-shadow: 0 0 0 0 rgba(214, 69, 61, 0.7); } to { box-shadow: 0 0 0 16px rgba(214, 69, 61, 0); } }
-:root[data-theme='dark'] .mk-name { background: rgba(230, 237, 242, 0.92); color: #0b1520; }
-:root[data-theme='dark'] .mk-dot, :root[data-theme='dark'] .mk-head, :root[data-theme='dark'] [data-zoom='near'] .mk-body { border-color: #0b1520; }
+:root[data-theme='dark'] .mk-name { background: rgba(230, 237, 242, 0.92); color: #000000; }
+:root[data-theme='dark'] .mk-dot, :root[data-theme='dark'] .mk-head, :root[data-theme='dark'] [data-zoom='near'] .mk-body { border-color: #000000; }
 
 /* Avatar picker shows exactly two full rows: columns = floor((width + 8) / 72) for minmax(64px, 1fr) + 8px gap. */
 .avatar-wrap { container-type: inline-size; }

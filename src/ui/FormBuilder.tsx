@@ -112,7 +112,7 @@ export default function FormBuilder({ initial, isAdmin, replacing = null, localI
     setBusy(true)
     const err = await publishForm(f, replacing)
     setBusy(false)
-    if (err) return setErrors([`Couldn't publish: ${err}. You can save it to this phone instead.`])
+    if (err) return setErrors([`Couldn't publish: ${err}. You can tap Save to keep it on this phone instead.`])
     onDone(replacing ? `Published version ${replacing.version + 1} of “${f.title}”.` : `Published “${f.title}” to everyone's phone.`)
   }
 
@@ -265,8 +265,8 @@ export default function FormBuilder({ initial, isAdmin, replacing = null, localI
       )}
 
       <div className="b-save">
-        {isAdmin && <button className="btn btn-lime grow" onClick={() => void save('publish')} disabled={busy}>{busy ? 'Publishing…' : replacing ? 'Publish update' : 'Publish to everyone'}</button>}
-        {!replacing && <button className={`btn grow ${isAdmin ? 'btn-ghost' : 'btn-lime'}`} onClick={() => void save('local')}>Save to this phone</button>}
+        {isAdmin && <button className="btn btn-lime grow" onClick={() => void save('publish')} disabled={busy}>{busy ? 'Publishing…' : replacing ? 'Publish update' : 'Publish'}</button>}
+        {!replacing && <button className={`btn grow ${isAdmin ? 'btn-ghost' : 'btn-lime'}`} onClick={() => void save('local')}>Save</button>}
       </div>
     </div>
   )

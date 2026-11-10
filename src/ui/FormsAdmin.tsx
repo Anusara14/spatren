@@ -77,7 +77,7 @@ export default function FormsAdmin() {
 
   return (
     <div className="stack" style={{ gap: 12 }}>
-      <p className="small muted">To add a survey, use Collect → Create form or Import form, then choose “Publish to everyone”.</p>
+      <p className="small muted">To add a survey, use Collect → Create form or Import form, then tap Publish.</p>
       {msg && <p className="note-ok">{msg}</p>}
       {forms.length === 0 && <p className="empty">No published surveys yet.</p>}
       {forms.map((f) => (

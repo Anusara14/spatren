@@ -132,14 +132,14 @@ export default function Collect({ isAdmin }: { isAdmin: boolean }) {
           </header>
 
           <nav className="kc-menu" aria-label="Collect">
-            <MenuItem icon={<IconFilePlus />} title="Start new form" sub={`${forms.length} form${forms.length === 1 ? '' : 's'} available`} onClick={() => setView('start')} accent />
-            <MenuItem icon={<IconFormEdit />} title="Create form" sub="Build questions, photo, voice, location and rules" onClick={() => { setEditing(null); setView('build') }} />
-            <MenuItem icon={<IconPencil />} title="Drafts" sub="Continue unfinished forms" count={drafts.length} onClick={() => setView('drafts')} />
-            <MenuItem icon={<IconUpload />} title="Ready to send" sub={ready.length ? 'Finalised, waiting to upload' : 'Nothing waiting'} count={ready.length} warn={ready.length > 0} onClick={() => setView('ready')} />
-            <MenuItem icon={<IconMic />} title="Transfer recordings" sub={untransferred ? 'Voice recordings to send to the laptop' : 'All recordings transferred'} count={untransferred} warn={untransferred > 0} onClick={() => setView('transfer')} />
-            <MenuItem icon={<IconCheckCircle />} title="Sent" sub="Uploaded from this phone" count={sent.length} onClick={() => setView('sent')} />
-            <MenuItem icon={<IconDownload />} title="Import form" sub="From ChatGPT, Gemini, Claude or a .json file" onClick={() => setView('import')} />
-            <MenuItem icon={<IconNote />} title="Quick note" sub="Photo, voice and notes without a form" onClick={() => setView('quick')} />
+            <MenuItem icon={<IconFilePlus />} title="Fill a form" sub={forms.length ? `${forms.length} ready` : 'None yet'} onClick={() => setView('start')} accent />
+            <MenuItem icon={<IconFormEdit />} title="Create form" sub="Make your own" onClick={() => { setEditing(null); setView('build') }} />
+            <MenuItem icon={<IconPencil />} title="Drafts" sub="Not finished yet" count={drafts.length} onClick={() => setView('drafts')} />
+            <MenuItem icon={<IconUpload />} title="Ready to send" sub={ready.length ? 'Waiting for signal' : 'Nothing waiting'} count={ready.length} warn={ready.length > 0} onClick={() => setView('ready')} />
+            <MenuItem icon={<IconMic />} title="Send recordings" sub={untransferred ? 'To the group laptop' : 'Nothing new'} count={untransferred} warn={untransferred > 0} onClick={() => setView('transfer')} />
+            <MenuItem icon={<IconCheckCircle />} title="Sent" sub="Uploaded" count={sent.length} onClick={() => setView('sent')} />
+            <MenuItem icon={<IconDownload />} title="Import form" sub="From AI or a file" onClick={() => setView('import')} />
+            <MenuItem icon={<IconNote />} title="Quick note" sub="Photo, voice or text" onClick={() => setView('quick')} />
           </nav>
 
         </>
@@ -147,8 +147,8 @@ export default function Collect({ isAdmin }: { isAdmin: boolean }) {
 
       {view === 'start' && (
         <>
-          {back('Start new form')}
-          {forms.length === 0 && <p className="empty">No forms yet. Use Import form, or wait for your coordinator to publish one. Published forms appear here automatically.</p>}
+          {back('Fill a form')}
+          {forms.length === 0 && <p className="empty">No forms yet. Use Import form, or wait for the admin to publish one. Published forms appear here automatically.</p>}
           {forms.map((f) => (
             <div key={f.id} className="kc-row">
               <button className="kc-row-main" onClick={() => setOpen(f)}>

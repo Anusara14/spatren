@@ -87,7 +87,7 @@ export default function Transfer({ records, onBack, onToast }: Props) {
     <div className="stack" style={{ gap: 16 }}>
       <header className="kc-sub">
         <button className="glass-btn sm" aria-label="Back to Collect" onClick={onBack}><IconBack /></button>
-        <h1 className="grow">Transfer recordings</h1>
+        <h1 className="grow">Send recordings</h1>
       </header>
 
       <section className="card stack" style={{ gap: 12 }}>

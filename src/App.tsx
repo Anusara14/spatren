@@ -6,17 +6,18 @@ import { syncNow } from './lib/sync'
 import { startTracking, wasTracking } from './lib/tracking'
 import Claim from './ui/Claim'
 import Field from './ui/Field'
-import { IconChart, IconField, IconPlus } from './ui/icons'
+import { IconChart, IconField, IconPlus, IconShield } from './ui/icons'
 import Login from './ui/Login'
 import { Mark } from './ui/Theme'
 
 // Code-split: the map engine, Collect and Admin load on first use (all precached by the service worker for offline).
 const Admin = lazy(() => import('./ui/Admin'))
 const Collect = lazy(() => import('./ui/Collect'))
+const Summary = lazy(() => import('./ui/Summary'))
 const FormRunner = lazy(() => import('./ui/FormRunner'))
 const loadSample = () => import('./lib/forms').then((m) => m.SAMPLE_FORM)
 
-type Tab = 'field' | 'collect' | 'admin'
+type Tab = 'field' | 'collect' | 'summary' | 'admin'
 const PROFILE_CACHE = 'spatren.profile'
 
 function cachedProfile(): Profile | null {
@@ -70,7 +71,8 @@ export default function App() {
   const tabs: { id: Tab; label: string; icon: JSX.Element; admin?: boolean }[] = [
     { id: 'field', label: 'Map', icon: <IconField /> },
     { id: 'collect', label: 'Collect', icon: <IconPlus /> },
-    { id: 'admin', label: 'Admin', icon: <IconChart />, admin: true },
+    { id: 'summary', label: 'Summary', icon: <IconChart /> },
+    { id: 'admin', label: 'Admin', icon: <IconShield />, admin: true },
   ]
 
   return (
@@ -90,6 +92,7 @@ export default function App() {
         <Suspense fallback={<div className="loading-pane" aria-busy="true" />}>
         {tab === 'field' && <Field profile={profile} onRecord={() => setTab('collect')} onProfileChange={() => void loadProfile()} />}
         {tab === 'collect' && <Collect isAdmin={profile.is_admin} />}
+        {tab === 'summary' && <Summary isAdmin={profile.is_admin} />}
         {tab === 'admin' && profile.is_admin && <Admin />}
         </Suspense>
       </main>
@@ -109,6 +112,7 @@ function DevPreview() {
   const h = location.hash
   if (h === '#collect-preview') return <div className="main"><Collect isAdmin /></div>
   if (h === '#admin-preview') return <div className="main"><Admin /></div>
+  if (h === '#summary-preview') return <div className="main"><Summary isAdmin={false} /></div>
   if (h === '#runner-preview') return <RunnerPreview />
   return <Field profile={fake} onRecord={() => undefined} onProfileChange={() => undefined} />
 }

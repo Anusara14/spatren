@@ -8,10 +8,10 @@ interface ClaimProps {
 }
 
 const MESSAGES: Record<string, string> = {
-  invalid_format: 'Index numbers look like 242343J: six digits and a capital letter.',
-  not_in_roster: "That index isn't on the L2S4 class list. Check it, or ask the class rep.",
-  already_claimed: 'That index is already linked to another Google account. Ask the class rep to reset it.',
-  pending: 'Thanks. The class rep will approve you shortly. Tap Check approval status in a minute.',
+  invalid_format: 'Index numbers look like 123456A: six digits and a capital letter.',
+  not_in_roster: "That index isn't on the L2S4 class list. Check it, or ask the admin.",
+  already_claimed: 'That index is already linked to another Google account. Ask the admin to reset it.',
+  pending: 'Thanks. The admin will approve you shortly. Tap Check approval status in a minute.',
 }
 
 export default function Claim({ profile, onDone }: ClaimProps) {
@@ -51,7 +51,7 @@ export default function Claim({ profile, onDone }: ClaimProps) {
           <input
             id="idx"
             className="input mono"
-            placeholder="242343J"
+            placeholder="e.g. 123456A"
             value={index}
             onChange={(e) => setIndex(e.target.value.toUpperCase().replace(/\s/g, ''))}
             maxLength={7}
@@ -62,8 +62,8 @@ export default function Claim({ profile, onDone }: ClaimProps) {
         </div>
         <div className="field">
           <label htmlFor="sn">Surname or nickname <span className="muted" style={{ fontWeight: 400 }}>(optional)</span></label>
-          <input id="sn" className="input" placeholder="e.g. Ranasinghe or Anusara" value={surname} onChange={(e) => setSurname(e.target.value)} />
-          <p className="small muted">Adding it gets you approved instantly. Without it, the class rep approves you.</p>
+          <input id="sn" className="input" placeholder="e.g. Perera or Nimal" value={surname} onChange={(e) => setSurname(e.target.value)} />
+          <p className="small muted">Adding it gets you approved instantly. Without it, the admin approves you.</p>
         </div>
         {msg && <p className="small card-flat">{msg}</p>}
         <button className="btn btn-primary btn-block" disabled={busy || index.length < 7}>

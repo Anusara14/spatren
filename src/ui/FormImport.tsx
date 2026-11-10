@@ -84,14 +84,14 @@ export default function FormImport({ isAdmin, replacing = null, onDone, onCancel
     const f = parsed.form
     const error = await publishForm(f, replacing)
     setBusy(false)
-    if (error) return setMsg(`Couldn't publish: ${error}. You can save it to this phone instead.`)
+    if (error) return setMsg(`Couldn't publish: ${error}. You can tap Save to keep it on this phone instead.`)
     onDone(replacing ? `Updated “${f.title}” to version ${replacing.version + 1}.` : `Published “${f.title}” to everyone's phone.`)
   }
 
   function keepLocal() {
     if (!parsed?.form) return
     saveLocalForm(parsed.form)
-    onDone(`Saved “${parsed.form.title}” on this phone. Find it under Start new form.`)
+    onDone(`Saved “${parsed.form.title}” on this phone. Find it under Fill a form.`)
   }
 
   return (
@@ -102,7 +102,7 @@ export default function FormImport({ isAdmin, replacing = null, onDone, onCancel
       <ol className="steps">
         <li><button className="link-btn" onClick={() => void copyPrompt()}>Copy the AI prompt</button>, paste it into your AI chat and describe the survey at the end.</li>
         <li>Copy the AI's reply, then <button className="link-btn" onClick={() => void pasteJson()}>paste it here</button> or <button className="link-btn" onClick={() => fileRef.current?.click()}>open a .json file</button>.</li>
-        <li>Check the preview, then save it{isAdmin ? ' to this phone or publish it to everyone' : ' to this phone'}.</li>
+        <li>Check the preview, then tap {isAdmin ? <><b>Save</b> (this phone) or <b>Publish</b> (everyone)</> : <><b>Save</b></>}.</li>
       </ol>
       <input ref={fileRef} type="file" accept=".json,application/json,text/plain" hidden onChange={(e) => {
         const f = e.target.files?.[0]
@@ -146,8 +146,8 @@ export default function FormImport({ isAdmin, replacing = null, onDone, onCancel
             </div>
           ))}
           <div className="row" style={{ flexWrap: 'wrap' }}>
-            {isAdmin && <button className="btn btn-lime grow" onClick={() => void publish()} disabled={busy}>{busy ? 'Publishing…' : replacing ? 'Publish update' : 'Publish to everyone'}</button>}
-            {!replacing && <button className={`btn grow ${isAdmin ? 'btn-ghost' : 'btn-lime'}`} onClick={keepLocal}>Save to this phone</button>}
+            {isAdmin && <button className="btn btn-lime grow" onClick={() => void publish()} disabled={busy}>{busy ? 'Publishing…' : replacing ? 'Publish update' : 'Publish'}</button>}
+            {!replacing && <button className={`btn grow ${isAdmin ? 'btn-ghost' : 'btn-lime'}`} onClick={keepLocal}>Save</button>}
           </div>
         </div>
       )}

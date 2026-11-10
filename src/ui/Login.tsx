@@ -8,10 +8,10 @@ import { StackedLogo } from './Theme'
 type Mode = 'login' | 'signup'
 
 const SIGNUP_MESSAGES: Record<string, string> = {
-  invalid_format: 'Index numbers look like 242343J: six digits and a capital letter.',
-  not_in_roster: "That index isn't on the class list. Check it, or ask the class rep.",
+  invalid_format: 'Index numbers look like 123456A: six digits and a capital letter.',
+  not_in_roster: "That index isn't on the class list. Check it, or ask the admin.",
   weak_password: 'Use a password of at least 6 characters.',
-  already_claimed: 'That index is already linked to another account (maybe Google). Log in with that, or ask the class rep to reset it.',
+  already_claimed: 'That index is already linked to another account (maybe Google). Log in with that, or ask the admin to reset it.',
   account_exists: 'You already have an account. Switch to Log in.',
 }
 
@@ -92,7 +92,7 @@ export default function Login() {
         <form className="stack" style={{ gap: 12 }} onSubmit={submit}>
           <div className="field">
             <label htmlFor="li-idx">University index</label>
-            <input id="li-idx" className="input mono" placeholder="242343J" value={index} maxLength={7} autoCapitalize="characters" autoComplete="username" required
+            <input id="li-idx" className="input mono" placeholder="e.g. 123456A" value={index} maxLength={7} autoCapitalize="characters" autoComplete="username" required
               onChange={(e) => setIndex(e.target.value.toUpperCase().replace(/\s/g, ''))} />
           </div>
           <div className="field">
@@ -108,8 +108,8 @@ export default function Login() {
               </div>
               <div className="field">
                 <label htmlFor="li-name">Surname or nickname <span className="muted" style={{ fontWeight: 400 }}>(optional)</span></label>
-                <input id="li-name" className="input" placeholder="e.g. Ranasinghe or Anusara" value={name} onChange={(e) => setName(e.target.value)} />
-                <p className="small muted">Adding it gets you approved instantly. Without it, the class rep approves you.</p>
+                <input id="li-name" className="input" placeholder="e.g. Perera or Nimal" value={name} onChange={(e) => setName(e.target.value)} />
+                <p className="small muted">Adding it gets you approved instantly. Without it, the admin approves you.</p>
               </div>
             </>
           )}
@@ -128,7 +128,7 @@ export default function Login() {
         </button>
         <InstallHint compact />
         <p className="small muted">
-          Forgot your password? Ask the class rep to reset your index, then sign up again. Location is shared only while Field Mode is on.
+          Forgot your password? Ask the admin to reset your index, then sign up again. Location is shared only while Field Mode is on.
         </p>
       </div>
     </div>

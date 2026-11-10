@@ -268,10 +268,10 @@ const PALETTES = {
     sky: '#dfe6ea', horizon: '#f2f4f4', fog: '#eef1f1',
   },
   dark: {
-    bg: '#16212b', water: '#1d3442', park: '#1f2d22', building2d: '#26323d', landuse: '#1a2530',
-    massLow: '#2b3845', massHigh: '#3c4b59', road: '#2f3d4a', casing: '#22303b', rail: '#2a3742',
-    label: '#93a5b3', waterLabel: '#6f93a6', halo: 'rgba(11,21,32,0.9)', light: 0.45,
-    sky: '#0e1822', horizon: '#1b2935', fog: '#16212b',
+    bg: '#0e0e0f', water: '#17232b', park: '#141c16', building2d: '#1c1c1e', landuse: '#121213',
+    massLow: '#242426', massHigh: '#36363a', road: '#29292c', casing: '#1a1a1c', rail: '#232325',
+    label: '#9a9aa0', waterLabel: '#73889a', halo: 'rgba(0,0,0,0.9)', light: 0.45,
+    sky: '#000000', horizon: '#151517', fog: '#0e0e0f',
   },
 } as const
 
@@ -322,7 +322,7 @@ function paintCity(m: MlMap, theme: Theme): void {
       }
     }
   }
-  if (m.getLayer('trail-casing')) set('trail-casing', 'line-color', theme === 'dark' ? '#0b1520' : '#ffffff')
+  if (m.getLayer('trail-casing')) set('trail-casing', 'line-color', theme === 'dark' ? '#000000' : '#ffffff')
   m.setLight({ anchor: 'viewport', color: '#ffffff', intensity: P.light, position: [1.4, 205, 35] })
   try {
     m.setSky({ 'sky-color': P.sky, 'horizon-color': P.horizon, 'fog-color': P.fog, 'sky-horizon-blend': 0.7, 'horizon-fog-blend': 0.6, 'fog-ground-blend': 0.85, 'atmosphere-blend': 0 })
