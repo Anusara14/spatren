@@ -49,7 +49,7 @@ export const db = new Dexie('spatren') as Dexie & {
 }
 
 /** Open-interview audio saved every 5 s while recording, so a crash, call or closed app loses nothing. */
-export type AudioChunk = { id?: number; session: string; blob: Blob }
+export type AudioChunk = { id?: number; session: string; blob: Blob; at?: number }
 
 db.version(1).stores({
   points: 'client_id, recorded_at', // outbox: deleted after confirmed upload

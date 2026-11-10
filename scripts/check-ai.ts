@@ -8,6 +8,9 @@ assert.equal(ok.questions.length, 3) // capped at 3
 assert.equal(ok.questions[1].si, 'Who decided it?') // missing Sinhala falls back to English
 assert.equal(ok.questions[2].si, 'How did it affect you?') // empty Sinhala too
 assert.throws(() => parseSuggestion('{"summary":"x","questions":[]}'), /no questions/)
+const greek = parseSuggestion('{"summary":"","questions":[{"si":"Κουντάι μήπως;","en":"Could you repeat that?"},{"si":"அது எப்போது?","en":"When was that?"}]}')
+assert.equal(greek.questions[0].si, 'Could you repeat that?') // wrong script -> English
+assert.equal(greek.questions[1].si, 'அது எப்போது?') // Tamil allowed
 assert.throws(() => parseSuggestion('not json'))
 
 const p = buildPrompt('Street vendors', ['When was that?'])

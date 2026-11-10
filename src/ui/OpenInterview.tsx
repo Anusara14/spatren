@@ -96,7 +96,7 @@ export default function OpenInterview({ onBack, onToast }: { onBack: () => void;
   const [aiBusy, setAiBusy] = useState(false)
   const [aiMsg, setAiMsg] = useState<string | null>(null)
   const [hasAi, setHasAi] = useState(false)
-  const [leftover, setLeftover] = useState<{ meta: LiveMeta; pieces: number } | null>(null)
+  const [leftover, setLeftover] = useState<{ meta: LiveMeta; seconds: number } | null>(null)
 
   const live = rec !== null
   const recRef = useRef<Recording | null>(null)
@@ -107,7 +107,11 @@ export default function OpenInterview({ onBack, onToast }: { onBack: () => void;
   useEffect(() => {
     const m = readLive()
     if (!m) return
-    void db.audioChunks.where('session').equals(m.session).count().then((n) => (n ? setLeftover({ meta: m, pieces: n }) : writeLive(null)))
+    void db.audioChunks.where('session').equals(m.session).sortBy('id').then((pieces) => {
+      if (!pieces.length) return writeLive(null)
+      const last = pieces[pieces.length - 1].at
+      setLeftover({ meta: m, seconds: last ? Math.max(1, Math.round((last - m.started) / 1000)) : pieces.length * 5 })
+    })
   }, [])
   useEffect(() => {
     if (!live) return
@@ -132,7 +136,7 @@ export default function OpenInterview({ onBack, onToast }: { onBack: () => void;
     setStarting(true)
     const session = crypto.randomUUID()
     try {
-      const r = await startRecording((piece) => void db.audioChunks.add({ session, blob: piece }).catch(() => undefined))
+      const r = await startRecording((piece) => void db.audioChunks.add({ session, blob: piece, at: Date.now() }).catch(() => undefined))
       const m = { ...meta, session, started: Date.now(), asked: [], notes: '' }
       setMeta(m)
       writeLive(m)
@@ -198,7 +202,7 @@ export default function OpenInterview({ onBack, onToast }: { onBack: () => void;
     const pieces = await db.audioChunks.where('session').equals(m.session).sortBy('id')
     const audio = new Blob(pieces.map((p) => p.blob), { type: pieces[0]?.blob.type || 'audio/webm' })
     try {
-      await saveInterview(m, audio, pieces.length * 5, true)
+      await saveInterview(m, audio, leftover.seconds, true)
       setLeftover(null)
       onToast('Unfinished interview saved. Find it under Send recordings.')
     } catch (e: unknown) {
@@ -217,7 +221,7 @@ export default function OpenInterview({ onBack, onToast }: { onBack: () => void;
         {leftover && (
           <section className="card stack oi-recover" style={{ gap: 10 }}>
             <b>Unfinished interview found</b>
-            <p className="small">“{leftover.meta.topic || 'Open interview'}”, about {mmss(leftover.pieces * 5)} recorded, was cut off. Save it so the audio isn't lost.</p>
+            <p className="small">“{leftover.meta.topic || 'Open interview'}”, {mmss(leftover.seconds)} recorded, was cut off. Save it so the audio isn't lost.</p>
             <div className="row">
               <button className="btn btn-lime btn-sm grow" onClick={() => void recover(true)}>Save it</button>
               <button className="btn btn-ghost btn-sm" onClick={() => void recover(false)}>Delete</button>

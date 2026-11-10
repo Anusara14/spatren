@@ -103,17 +103,22 @@ export function buildPrompt(topic: string, earlier: string[], theme = ''): strin
     'summary: what the interviewee just said, in English, at most 2 short sentences.',
     'questions: exactly 3 open, neutral, non-leading follow-up questions that dig into what was just said',
     '(ask for an example, a reason, how it changed over time, who is affected, or what they would change).',
-    'si = the question in the language the interviewee is speaking (Sinhala script for Sinhala); en = English.',
+    'si = the question in Sinhala script (use Tamil script only if the interviewee clearly speaks Tamil). Never use any other language or script. en = English.',
+    'If the audio is silent, unclear or not an interview, set summary to "Could not hear the person clearly." and give 3 general opening questions about the topic.',
     'Keep each question short and polite. Never pressure about politics, religion, income or personal identity.',
   ].filter(Boolean).join('\n')
 }
+
+// Sinhala (U+0D80–0DFF), Tamil (U+0B80–0BFF), zero-width joiners used in Sinhala conjuncts, Latin, digits, punctuation.
+const SHOWN_SCRIPTS = /^[඀-෿஀-௿‌‍\sA-Za-z0-9\p{P}]+$/u
 
 /** Validates Gemini's reply; throws a readable error instead of showing junk. */
 export function parseSuggestion(text: string): Suggestion {
   const raw = JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g, '')) as Partial<Suggestion>
   const questions = (Array.isArray(raw.questions) ? raw.questions : [])
     .filter((q): q is FollowUp => !!q && typeof q.en === 'string' && q.en.trim() !== '')
-    .map((q) => ({ en: q.en.trim(), si: typeof q.si === 'string' && q.si.trim() ? q.si.trim() : q.en.trim() }))
+    // Only Sinhala, Tamil or plain Latin text is shown; anything else (the model drifting into another script) falls back to English.
+    .map((q) => ({ en: q.en.trim(), si: typeof q.si === 'string' && SHOWN_SCRIPTS.test(q.si.trim()) ? q.si.trim() : q.en.trim() }))
     .slice(0, 3)
   if (!questions.length) throw new Error('The AI reply had no questions. Try again.')
   return { summary: typeof raw.summary === 'string' ? raw.summary.trim() : '', questions }

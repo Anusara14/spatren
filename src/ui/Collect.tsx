@@ -39,6 +39,8 @@ export default function Collect({ isAdmin }: { isAdmin: boolean }) {
   const [open, setOpen] = useState<FormRow | null>(null)
   const [records, setRecords] = useState<LocalRecord[]>([])
   const [toast, setToast] = useState<string | null>(null)
+  // An open interview cut off by a crash or closed app (its audio is kept until saved or deleted).
+  const unfinished = view === 'home' && localStorage.getItem('spatren.oi.live') !== null
   const [sending, setSending] = useState(false)
   const [editing, setEditing] = useState<FormRow | null>(null)
   const online = useOnline()
@@ -134,7 +136,7 @@ export default function Collect({ isAdmin }: { isAdmin: boolean }) {
 
           <h2 className="kc-group">Collect</h2>
           <nav className="kc-menu" aria-label="Collect">
-            <MenuItem icon={<IconUsers />} title="Open interview" sub="Voice, question cards, AI follow-ups" onClick={() => setView('interview')} accent />
+            <MenuItem icon={<IconUsers />} title="Open interview" sub={unfinished ? 'Unfinished interview: tap to save it' : 'Voice, question cards, AI follow-ups'} count={unfinished ? 1 : 0} warn onClick={() => setView('interview')} accent />
             <MenuItem icon={<IconFilePlus />} title="Fill a form" sub={forms.length ? `${forms.length} ready` : 'None yet'} onClick={() => setView('start')} />
             <MenuItem icon={<IconNote />} title="Quick note" sub="Photo, voice or text" onClick={() => setView('quick')} />
           </nav>
