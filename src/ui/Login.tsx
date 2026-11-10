@@ -3,9 +3,10 @@ import { oauthRedirect, openOAuth } from '../lib/native'
 import { emailForIndex, supabase } from '../lib/supabase'
 import { IconGoogle } from './icons'
 import InstallHint, { IS_IOS, IS_STANDALONE } from './InstallHint'
+import Credits from './Credits'
 import { StackedLogo } from './Theme'
 
-type Mode = 'login' | 'signup' | 'index'
+type Mode = 'login' | 'signup'
 
 const SIGNUP_MESSAGES: Record<string, string> = {
   invalid_format: 'Index numbers look like 123456A: six digits and a capital letter.',
@@ -60,7 +61,6 @@ export default function Login() {
     if (!/^\d{6}[A-Z]$/.test(idx)) return setError(SIGNUP_MESSAGES.invalid_format)
     if (mode === 'signup' && password !== confirm) return setError("The two passwords don't match.")
     setBusy(true)
-    if (mode === 'index') return joinWithIndex(idx)
     try {
       if (mode === 'signup') {
         const { data, error } = await supabase.functions.invoke<{ status: string; message?: string }>('signup-index', {
@@ -72,25 +72,6 @@ export default function Login() {
       }
       const { error } = await supabase.auth.signInWithPassword({ email: emailForIndex(idx), password })
       if (error) throw new Error(friendly(error.message))
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Something went wrong. Try again.')
-      setBusy(false)
-    }
-  }
-
-  // No Gmail, no password: an anonymous account on this phone, linked to the index. With a matching surname or
-  // nickname it's approved at once; otherwise the admin approves it.
-  async function joinWithIndex(idx: string) {
-    try {
-      const { error: aErr } = await supabase.auth.signInAnonymously()
-      if (aErr) throw new Error(/rate limit/i.test(aErr.message) ? 'Too many people joined from this network just now. Wait a few minutes and try again.' : aErr.message)
-      const { data, error: cErr } = await supabase.rpc('claim_index', { p_index: idx, p_surname: name })
-      const status = String(data ?? '')
-      if (cErr || !['approved', 'pending', 'already_approved'].includes(status)) {
-        await supabase.auth.signOut()
-        throw new Error(SIGNUP_MESSAGES[status] ?? cErr?.message ?? 'Could not join. Try again.')
-      }
-      // The app picks up the new session and shows the map (or the waiting-for-approval screen).
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Try again.')
       setBusy(false)
@@ -116,18 +97,11 @@ export default function Login() {
             <input id="li-idx" className="input mono" placeholder="e.g. 123456A" value={index} maxLength={7} autoCapitalize="characters" autoComplete="username" required
               onChange={(e) => setIndex(e.target.value.toUpperCase().replace(/\s/g, ''))} />
           </div>
-          {mode !== 'index' && <div className="field">
+          <div className="field">
             <label htmlFor="li-pw">Password</label>
             <input id="li-pw" className="input" type="password" minLength={6} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} required
               value={password} onChange={(e) => setPassword(e.target.value)} />
-          </div>}
-          {mode === 'index' && (
-            <div className="field">
-              <label htmlFor="li-name2">Surname or nickname <span className="muted" style={{ fontWeight: 400 }}>(optional)</span></label>
-              <input id="li-name2" className="input" placeholder="e.g. Perera or Nimal" value={name} onChange={(e) => setName(e.target.value)} />
-              <p className="small muted">No password needed. With your surname or nickname you're in straight away; without it, the admin approves you. This phone stays signed in.</p>
-            </div>
-          )}
+          </div>
           {mode === 'signup' && (
             <>
               <div className="field">
@@ -143,13 +117,10 @@ export default function Login() {
           )}
           {error && <p className="small" role="alert" style={{ color: 'var(--danger)' }}>{error}</p>}
           <button className="btn btn-lime btn-block" style={{ height: 54 }} disabled={busy}>
-            {busy ? 'Please wait…' : mode === 'login' ? 'Log in' : mode === 'index' ? 'Join with index' : 'Create account'}
+            {busy ? 'Please wait…' : mode === 'login' ? 'Log in' : 'Create account'}
           </button>
         </form>
 
-        <button type="button" className="link-btn small" style={{ alignSelf: 'center' }} onClick={() => switchTo(mode === 'index' ? 'login' : 'index')}>
-          {mode === 'index' ? 'Use a password instead' : 'No Gmail or password? Join with your index only'}
-        </button>
 
         <div className="or"><span>or</span></div>
         {IS_IOS && IS_STANDALONE && (
@@ -160,8 +131,9 @@ export default function Login() {
         </button>
         <InstallHint compact />
         <p className="small muted">
-          Forgot your password? Ask the admin to reset your index, then sign up again. Location is shared only while Field Mode is on.
+          No Gmail? Tap <b>Sign up</b> and use your index with a password. Forgot your password? Ask the admin to reset your index, then sign up again.
         </p>
+        <Credits />
       </div>
     </div>
   )

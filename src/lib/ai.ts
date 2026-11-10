@@ -92,10 +92,11 @@ async function base64(blob: Blob): Promise<string> {
   return btoa(bin)
 }
 
-export function buildPrompt(topic: string, earlier: string[]): string {
+export function buildPrompt(topic: string, earlier: string[], theme = ''): string {
   return [
     'You help a university urban-planning student run an open-ended field interview in Anuradhapura, Sri Lanka.',
     `Interview topic: ${topic || 'not given'}.`,
+    theme ? `The student's research theme: ${theme}. Lean the questions towards it.` : '',
     'The audio is the latest part of the interview. People mostly speak Sinhala; some Tamil or English.',
     earlier.length ? `Questions already asked or suggested (do not repeat): ${earlier.map((q) => `"${q}"`).join('; ')}.` : '',
     'Reply with JSON only: {"summary": string, "questions": [{"si": string, "en": string}]}.',
@@ -118,7 +119,7 @@ export function parseSuggestion(text: string): Suggestion {
   return { summary: typeof raw.summary === 'string' ? raw.summary.trim() : '', questions }
 }
 
-export async function suggestFollowUps(cfg: AiConfig, audio: Blob, topic: string, earlier: string[]): Promise<Suggestion> {
+export async function suggestFollowUps(cfg: AiConfig, audio: Blob, topic: string, earlier: string[], theme = ''): Promise<Suggestion> {
   let clip: Blob
   try {
     clip = await toWav(audio)
@@ -127,7 +128,7 @@ export async function suggestFollowUps(cfg: AiConfig, audio: Blob, topic: string
   }
   if (clip.size > 15 * 1024 * 1024) throw new Error('Recording too long to send. Keep the clip under 2 minutes.')
   const body = {
-    contents: [{ parts: [{ text: buildPrompt(topic, earlier) }, { inline_data: { mime_type: clip.type.split(';')[0] || 'audio/webm', data: await base64(clip) } }] }],
+    contents: [{ parts: [{ text: buildPrompt(topic, earlier, theme) }, { inline_data: { mime_type: clip.type.split(';')[0] || 'audio/webm', data: await base64(clip) } }] }],
     generationConfig: { responseMimeType: 'application/json', temperature: 0.5 },
   }
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(cfg.model)}:generateContent`, {

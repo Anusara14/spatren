@@ -132,16 +132,25 @@ export default function Collect({ isAdmin }: { isAdmin: boolean }) {
             <span className={`chip ${online ? 'chip-lime' : ''}`}><span className={`dot ${online ? 'live' : 'offline'}`} />{online ? 'Online' : 'Offline'}</span>
           </header>
 
+          <h2 className="kc-group">Collect</h2>
           <nav className="kc-menu" aria-label="Collect">
-            <MenuItem icon={<IconFilePlus />} title="Fill a form" sub={forms.length ? `${forms.length} ready` : 'None yet'} onClick={() => setView('start')} accent />
-            <MenuItem icon={<IconFormEdit />} title="Create form" sub="Make your own" onClick={() => { setEditing(null); setView('build') }} />
-            <MenuItem icon={<IconPencil />} title="Drafts" sub="Not finished yet" count={drafts.length} onClick={() => setView('drafts')} />
-            <MenuItem icon={<IconUpload />} title="Ready to send" sub={ready.length ? 'Waiting for signal' : 'Nothing waiting'} count={ready.length} warn={ready.length > 0} onClick={() => setView('ready')} />
-            <MenuItem icon={<IconMic />} title="Send recordings" sub={untransferred ? 'To the group laptop' : 'Nothing new'} count={untransferred} warn={untransferred > 0} onClick={() => setView('transfer')} />
-            <MenuItem icon={<IconCheckCircle />} title="Sent" sub="Uploaded" count={sent.length} onClick={() => setView('sent')} />
-            <MenuItem icon={<IconDownload />} title="Import form" sub="From AI or a file" onClick={() => setView('import')} />
-            <MenuItem icon={<IconUsers />} title="Open interview" sub="Voice + AI follow-ups" onClick={() => setView('interview')} />
+            <MenuItem icon={<IconUsers />} title="Open interview" sub="Voice, question cards, AI follow-ups" onClick={() => setView('interview')} accent />
+            <MenuItem icon={<IconFilePlus />} title="Fill a form" sub={forms.length ? `${forms.length} ready` : 'None yet'} onClick={() => setView('start')} />
             <MenuItem icon={<IconNote />} title="Quick note" sub="Photo, voice or text" onClick={() => setView('quick')} />
+          </nav>
+
+          <h2 className="kc-group">On this phone</h2>
+          <nav className="kc-menu" aria-label="On this phone">
+            <MenuItem icon={<IconMic />} title="Send recordings" sub={untransferred ? 'To the group laptop' : 'Nothing new'} count={untransferred} warn={untransferred > 0} onClick={() => setView('transfer')} />
+            <MenuItem icon={<IconUpload />} title="Ready to send" sub={ready.length ? 'Waiting for signal' : 'Nothing waiting'} count={ready.length} warn={ready.length > 0} onClick={() => setView('ready')} />
+            <MenuItem icon={<IconPencil />} title="Drafts" sub="Not finished yet" count={drafts.length} onClick={() => setView('drafts')} />
+            <MenuItem icon={<IconCheckCircle />} title="Sent" sub="Uploaded" count={sent.length} onClick={() => setView('sent')} />
+          </nav>
+
+          <h2 className="kc-group">Forms</h2>
+          <nav className="kc-menu" aria-label="Forms">
+            <MenuItem icon={<IconFormEdit />} title="Create form" sub="Make your own" onClick={() => { setEditing(null); setView('build') }} />
+            <MenuItem icon={<IconDownload />} title="Import form" sub="From AI or a file" onClick={() => setView('import')} />
           </nav>
 
         </>

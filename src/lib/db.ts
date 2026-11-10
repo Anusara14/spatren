@@ -45,7 +45,11 @@ export const db = new Dexie('spatren') as Dexie & {
   sos: EntityTable<PendingSos, 'id'>
   records: EntityTable<LocalRecord, 'id'>
   trail: EntityTable<PendingPoint, 'client_id'>
+  audioChunks: EntityTable<AudioChunk, 'id'>
 }
+
+/** Open-interview audio saved every 5 s while recording, so a crash, call or closed app loses nothing. */
+export type AudioChunk = { id?: number; session: string; blob: Blob }
 
 db.version(1).stores({
   points: 'client_id, recorded_at', // outbox: deleted after confirmed upload
@@ -53,6 +57,7 @@ db.version(1).stores({
   records: 'id, synced, recorded_at',
   trail: 'client_id, recorded_at', // own trail for the offline map; pruned to 3 days
 })
+db.version(2).stores({ audioChunks: '++id, session' })
 
 // Ask the browser not to evict our data (matters most on iOS Safari).
 export async function requestPersistence(): Promise<boolean> {

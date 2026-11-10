@@ -26,15 +26,19 @@ export const extFor = (mime: string): string =>
 export interface Recording {
   stop: () => Promise<Blob>
   cancel: () => void
-  /** Everything recorded so far, while recording continues (for AI follow-up suggestions). */
-  snapshot: () => Promise<Blob>
+  /**
+   * The recording so far, while it continues (for AI follow-ups). With `lastPieces`, only the header piece plus the
+   * last N 5-second pieces: a 45-minute interview must never be decoded whole on a phone (hundreds of MB of RAM).
+   */
+  snapshot: (lastPieces?: number) => Promise<Blob>
 }
 
 // Speech-tuned bitrates: Opus stays clear at 16 kbps; AAC (older iPhones) gets muddy below 32 kbps.
 // Speech recognisers resample to 16 kHz mono anyway, so higher rates mostly cost storage.
 const bitrateFor = (mime: string) => (mime.includes('mp4') || mime.includes('aac') ? 32_000 : 16_000)
 
-export async function startRecording(): Promise<Recording> {
+/** onChunk receives each 5-second piece as it is recorded (open interviews save them to disk). */
+export async function startRecording(onChunk?: (piece: Blob) => void): Promise<Recording> {
   const stream = await navigator.mediaDevices.getUserMedia({
     // Raw-ish audio transcribes better than browser noise suppression, which smears consonants; keep level steady.
     audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: true },
@@ -42,7 +46,11 @@ export async function startRecording(): Promise<Recording> {
   const mimeType = pickAudioMime()
   const rec = new MediaRecorder(stream, { ...(mimeType ? { mimeType } : {}), audioBitsPerSecond: bitrateFor(mimeType) })
   const chunks: Blob[] = []
-  rec.ondataavailable = (e) => e.data.size && chunks.push(e.data)
+  rec.ondataavailable = (e) => {
+    if (!e.data.size) return
+    chunks.push(e.data)
+    onChunk?.(e.data)
+  }
   rec.start(5_000) // flush every 5 s so a crash loses at most a few seconds
   // iOS stops the microphone when the screen locks: keep it awake for the whole recording.
   let lock: WakeLockSentinel | null = null
@@ -75,11 +83,13 @@ export async function startRecording(): Promise<Recording> {
       rec.onstop = release
       rec.stop()
     },
-    snapshot: () =>
+    snapshot: (lastPieces?: number) =>
       new Promise<Blob>((resolve) => {
         const type = rec.mimeType || mimeType || 'audio/webm'
-        if (rec.state !== 'recording') return resolve(new Blob(chunks, { type }))
-        const done = () => resolve(new Blob(chunks, { type }))
+        // The first piece carries the container header (WebM/MP4 init), so header + recent pieces still decodes.
+        const pick = () => (lastPieces && chunks.length > lastPieces + 1 ? [chunks[0], ...chunks.slice(-lastPieces)] : chunks)
+        if (rec.state !== 'recording') return resolve(new Blob(pick(), { type }))
+        const done = () => resolve(new Blob(pick(), { type }))
         rec.addEventListener('dataavailable', done, { once: true }) // runs after ondataavailable has pushed the chunk
         rec.requestData()
       }),

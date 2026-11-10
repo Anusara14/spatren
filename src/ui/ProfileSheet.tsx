@@ -6,6 +6,7 @@ import { oauthRedirect, openOAuth } from '../lib/native'
 import { avatarUrl, nameOf, supabase, type Profile } from '../lib/supabase'
 import { stopTracking } from '../lib/tracking'
 import { IconClose, IconGoogle, IconSync } from './icons'
+import Credits from './Credits'
 import { ThemeToggle } from './Theme'
 
 const BASE_SEEDS = ['Aneka', 'Felix', 'Jasper', 'Luna', 'Milo', 'Nova', 'Orion', 'Pepper', 'Quinn', 'Riley', 'Sage', 'Theo', 'Uma', 'Vivi', 'Wren', 'Zara', 'Kiran', 'Asha', 'Dilan', 'Mali', 'Nila', 'Ravi', 'Sena', 'Tara']
@@ -126,6 +127,8 @@ export default function ProfileSheet({ profile, onClose, onChanged }: Props) {
           )}
           <button className="btn btn-ghost" onClick={() => void signOut()}>Sign out</button>
         </section>
+
+        <Credits />
       </div>
     </div>
   )
@@ -140,9 +143,13 @@ function AiKeySection() {
   return (
     <section className="stack" style={{ gap: 8 }}>
       <h3 className="section-title" style={{ margin: 0 }}>AI follow-ups</h3>
-      <p className="small muted">
-        For open interviews. Get a free key at <b>aistudio.google.com/apikey</b> (sign in with any Gmail, no card), copy it, paste it here. It stays on this phone only.
-      </p>
+      <p className="small muted">Suggests follow-up questions during open interviews. Free, takes 1 minute:</p>
+      <ol className="steps small">
+        <li>Open <a className="link-btn" href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">aistudio.google.com/apikey</a> and sign in with any Gmail.</li>
+        <li>Tap <b>Create API key</b>, then copy it.</li>
+        <li>Paste it below, tap <b>Test key</b>, then <b>Save</b>.</li>
+      </ol>
+      <p className="tiny muted">No card needed. The key stays on this phone only and is never uploaded.</p>
       <div className="row">
         <input className="input grow" type="password" autoComplete="off" placeholder="Paste your AI key" value={key} onChange={(e) => setKey(e.target.value)} />
       </div>
