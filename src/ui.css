@@ -239,3 +239,6 @@ input, textarea, select { -webkit-user-select: text; user-select: text; }
   .tabbar { bottom: var(--tab-b); } /* sit just above the home indicator, not 46pt up */
   .dock { bottom: calc(80px + var(--tab-b)); }
 }
+/* Sheets opened from the map live inside the fixed map layer, which sits under the tab bar; while one is open, drop
+   the tab bar under the map layer so the sheet (and its last rows) aren't hidden behind it. */
+.shell:has(.immersive .sheet-backdrop) .tabbar { z-index: 0; }
