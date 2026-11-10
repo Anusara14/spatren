@@ -11,3 +11,7 @@ dev-dist
 *.jks
 *.keystore
 keystore.properties
+
+# Built APKs (upload to GitHub Releases instead)
+release/
+*.apk
