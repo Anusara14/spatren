@@ -34,6 +34,7 @@ export async function listenForAuthReturn(): Promise<void> {
   // Hardware Back: close the top sheet, leave the open form or screen, go back to the map, else send the app to the
   // background (never quit it, so Field Mode keeps tracking).
   await App.addListener('backButton', () => {
+    if (document.querySelector('.oi-live')) return // recording an interview: Back must not drop it (use Stop & save)
     const last = <T extends Element>(sel: string) => [...document.querySelectorAll<T>(sel)].pop()
     const target =
       last<HTMLElement>('.sheet-backdrop') ??
