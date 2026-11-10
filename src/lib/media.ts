@@ -26,6 +26,8 @@ export const extFor = (mime: string): string =>
 export interface Recording {
   stop: () => Promise<Blob>
   cancel: () => void
+  /** Everything recorded so far, while recording continues (for AI follow-up suggestions). */
+  snapshot: () => Promise<Blob>
 }
 
 // Speech-tuned bitrates: Opus stays clear at 16 kbps; AAC (older iPhones) gets muddy below 32 kbps.
@@ -73,5 +75,13 @@ export async function startRecording(): Promise<Recording> {
       rec.onstop = release
       rec.stop()
     },
+    snapshot: () =>
+      new Promise<Blob>((resolve) => {
+        const type = rec.mimeType || mimeType || 'audio/webm'
+        if (rec.state !== 'recording') return resolve(new Blob(chunks, { type }))
+        const done = () => resolve(new Blob(chunks, { type }))
+        rec.addEventListener('dataavailable', done, { once: true }) // runs after ondataavailable has pushed the chunk
+        rec.requestData()
+      }),
   }
 }

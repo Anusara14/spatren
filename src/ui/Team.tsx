@@ -6,6 +6,7 @@ export default function Team() {
   const [rows, setRows] = useState<TeamRow[]>([])
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
+  const [aiKey, setAiKey] = useState('')
   const [saved, setSaved] = useState(false)
   const [q, setQ] = useState('')
   const [grp, setGrp] = useState('All')
@@ -20,6 +21,7 @@ export default function Team() {
     void supabase.from('settings').select('*').single().then(({ data }) => {
       setName(data?.coordinator_name ?? '')
       setPhone(data?.coordinator_phone ?? '')
+      setAiKey(data?.ai_key ?? '')
     })
   }, [load])
 
@@ -36,7 +38,7 @@ export default function Team() {
 
   async function saveSettings(e: FormEvent) {
     e.preventDefault()
-    await supabase.from('settings').update({ coordinator_name: name, coordinator_phone: phone, updated_at: new Date().toISOString() }).eq('id', 1)
+    await supabase.from('settings').update({ coordinator_name: name, coordinator_phone: phone, ai_key: aiKey.trim() || null, updated_at: new Date().toISOString() }).eq('id', 1)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
@@ -55,7 +57,10 @@ export default function Team() {
         <p className="small muted">Students see this when an SOS can't reach the server, as an SMS and call button. Use a phone that is with you in the field.</p>
         <input className="input" placeholder="Name, e.g. Admin" value={name} onChange={(e) => setName(e.target.value)} />
         <input className="input tnum" placeholder="+94 7X XXX XXXX" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
-        <button className="btn btn-primary">{saved ? 'Saved' : 'Save contact'}</button>
+        <h2 className="section-title" style={{ margin: '8px 0 0' }}>Class AI key (optional)</h2>
+        <p className="small muted">Used for open-interview follow-ups by students who haven't added their own key. One free key is shared by everyone, so it can run out at busy moments; students' own keys are better.</p>
+        <input className="input" type="password" autoComplete="off" placeholder="Gemini key from aistudio.google.com/apikey" value={aiKey} onChange={(e) => setAiKey(e.target.value)} />
+        <button className="btn btn-primary">{saved ? 'Saved' : 'Save settings'}</button>
       </form>
 
       {pending.length > 0 && (

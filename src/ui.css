@@ -251,3 +251,18 @@ input, textarea, select { -webkit-user-select: text; user-select: text; }
 }
 .update-banner b { display: block; font-size: 15px; }
 .update-banner span { display: block; font-size: 12.5px; color: var(--ink-3); }
+
+/* Open interview */
+.rec-dot { background: var(--danger); box-shadow: 0 0 0 4px var(--danger-wash); animation: pulse 1.4s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: 0.35; } }
+.oi-live { position: sticky; top: calc(8px + var(--safe-t)); z-index: 5; }
+.oi-q {
+  display: flex; flex-direction: column; gap: 4px; text-align: left; width: 100%; padding: 12px 14px; border-radius: var(--r-sm);
+  border: 1.5px solid var(--line); background: var(--surface-2); color: var(--ink); transition: border-color 0.15s, opacity 0.15s;
+}
+.oi-q:active { transform: scale(0.99); }
+.oi-q.done { opacity: 0.55; border-color: var(--lime); }
+.oi-si { font-size: 16px; font-weight: 600; line-height: 1.4; }
+.oi-en { font-size: 13px; color: var(--ink-3); }
+.oi-tag { font-size: 11px; font-weight: 600; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; }
+.oi-q.done .oi-tag { color: var(--lime-deep); }

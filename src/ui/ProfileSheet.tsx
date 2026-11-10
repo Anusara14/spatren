@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { groupColor } from '../lib/geo'
 import { askNotificationPermission, notificationState } from '../lib/meeting'
+import { myAiKey, saveMyAiKey, testAiKey } from '../lib/ai'
 import { oauthRedirect, openOAuth } from '../lib/native'
 import { avatarUrl, nameOf, supabase, type Profile } from '../lib/supabase'
 import { stopTracking } from '../lib/tracking'
@@ -46,7 +47,10 @@ export default function ProfileSheet({ profile, onClose, onChanged }: Props) {
   }
 
   async function signOut() {
-    if (!confirm('Sign out of SPATREN on this phone? Anything not uploaded yet stays on the phone and uploads after you sign in again.')) return
+    const warn = kind === 'anonymous'
+      ? 'You joined with your index only, so signing out ends this login for good: to come back, the admin must reset your index. Link Google first to keep it. Sign out anyway?'
+      : 'Sign out of SPATREN on this phone? Anything not uploaded yet stays on the phone and uploads after you sign in again.'
+    if (!confirm(warn)) return
     await stopTracking().catch(() => undefined)
     localStorage.removeItem('spatren.profile')
     await supabase.auth.signOut()
@@ -102,6 +106,8 @@ export default function ProfileSheet({ profile, onClose, onChanged }: Props) {
           )}
         </section>
 
+        <AiKeySection />
+
         <section className="stack" style={{ gap: 8 }}>
           <h3 className="section-title" style={{ margin: 0 }}>Account</h3>
           {kind === 'google' && <p className="small muted">Signed in with Google.</p>}
@@ -112,6 +118,7 @@ export default function ProfileSheet({ profile, onClose, onChanged }: Props) {
             </form>
           )}
           {pwMsg && <p className="small muted">{pwMsg}</p>}
+          {kind === 'anonymous' && <p className="small muted">Joined with your index only (no password). It stays signed in on this phone. Link Google to use it on another phone too.</p>}
           {kind === 'anonymous' && (
             <button className="btn google-btn btn-sm" onClick={() => void supabase.auth.linkIdentity({ provider: 'google', options: oauthRedirect() }).then(({ data }) => openOAuth(data?.url))}>
               <IconGoogle /> Link a Google account
@@ -121,5 +128,29 @@ export default function ProfileSheet({ profile, onClose, onChanged }: Props) {
         </section>
       </div>
     </div>
+  )
+}
+
+/** Personal Gemini key for open-interview follow-ups. Kept only on this phone. */
+function AiKeySection() {
+  const [key, setKey] = useState(myAiKey()?.key ?? '')
+  const [msg, setMsg] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const saved = myAiKey()?.key ?? ''
+  return (
+    <section className="stack" style={{ gap: 8 }}>
+      <h3 className="section-title" style={{ margin: 0 }}>AI follow-ups</h3>
+      <p className="small muted">
+        For open interviews. Get a free key at <b>aistudio.google.com/apikey</b> (sign in with any Gmail, no card), copy it, paste it here. It stays on this phone only.
+      </p>
+      <div className="row">
+        <input className="input grow" type="password" autoComplete="off" placeholder="Paste your AI key" value={key} onChange={(e) => setKey(e.target.value)} />
+      </div>
+      <div className="row">
+        <button className="btn btn-lime btn-sm" disabled={busy || key.trim() === saved} onClick={() => { saveMyAiKey(key); setMsg(key.trim() ? 'Saved.' : 'Removed. The class key is used if the admin set one.') }}>Save</button>
+        <button className="btn btn-ghost btn-sm" disabled={busy || !key.trim()} onClick={() => { setBusy(true); void testAiKey(key).then(setMsg).catch(() => setMsg('No internet to check the key.')).finally(() => setBusy(false)) }}>{busy ? 'Checking…' : 'Test key'}</button>
+      </div>
+      {msg && <p className="small muted">{msg}</p>}
+    </section>
   )
 }

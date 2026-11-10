@@ -6,16 +6,17 @@ import { clock } from '../lib/geo'
 import { supabase } from '../lib/supabase'
 import { syncNow, useOnline } from '../lib/sync'
 import Capture from './Capture'
+import OpenInterview from './OpenInterview'
 import FormBuilder from './FormBuilder'
 import Transfer from './Transfer'
 import FormImport, { localForms, removeLocalForm } from './FormImport'
 import FormRunner, { type FormRow } from './FormRunner'
-import { IconBack, IconCheckCircle, IconChevrons, IconDownload, IconFilePlus, IconFormEdit, IconMic, IconNote, IconPencil, IconTrash, IconUpload } from './icons'
+import { IconBack, IconCheckCircle, IconChevrons, IconDownload, IconFilePlus, IconFormEdit, IconMic, IconNote, IconPencil, IconTrash, IconUpload, IconUsers } from './icons'
 import { Mark } from './Theme'
 
 const FORMS_CACHE = 'spatren.forms'
 const draftKey = (id: string) => `spatren.draft.${id}`
-type View = 'home' | 'start' | 'drafts' | 'ready' | 'sent' | 'import' | 'quick' | 'build' | 'transfer'
+type View = 'home' | 'start' | 'drafts' | 'ready' | 'sent' | 'import' | 'quick' | 'build' | 'transfer' | 'interview'
 
 function cachedForms(): FormRow[] {
   try {
@@ -96,6 +97,7 @@ export default function Collect({ isAdmin }: { isAdmin: boolean }) {
       />
     )
   if (view === 'quick') return <Capture onBack={() => setView('home')} />
+  if (view === 'interview') return <><OpenInterview onBack={() => setView('home')} onToast={setToast} />{toast && <div className="toast">{toast}</div>}</>
   if (view === 'transfer') return <><Transfer records={records} onBack={() => setView('home')} onToast={setToast} />{toast && <div className="toast">{toast}</div>}</>
   if (view === 'build')
     return (
@@ -126,7 +128,6 @@ export default function Collect({ isAdmin }: { isAdmin: boolean }) {
             <Mark size={44} />
             <div className="grow">
               <h1>SPATREN Collect</h1>
-              <p>L2S4 · Anuradhapura field visit</p>
             </div>
             <span className={`chip ${online ? 'chip-lime' : ''}`}><span className={`dot ${online ? 'live' : 'offline'}`} />{online ? 'Online' : 'Offline'}</span>
           </header>
@@ -139,6 +140,7 @@ export default function Collect({ isAdmin }: { isAdmin: boolean }) {
             <MenuItem icon={<IconMic />} title="Send recordings" sub={untransferred ? 'To the group laptop' : 'Nothing new'} count={untransferred} warn={untransferred > 0} onClick={() => setView('transfer')} />
             <MenuItem icon={<IconCheckCircle />} title="Sent" sub="Uploaded" count={sent.length} onClick={() => setView('sent')} />
             <MenuItem icon={<IconDownload />} title="Import form" sub="From AI or a file" onClick={() => setView('import')} />
+            <MenuItem icon={<IconUsers />} title="Open interview" sub="Voice + AI follow-ups" onClick={() => setView('interview')} />
             <MenuItem icon={<IconNote />} title="Quick note" sub="Photo, voice or text" onClick={() => setView('quick')} />
           </nav>
 
