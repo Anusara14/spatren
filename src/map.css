@@ -250,4 +250,6 @@ a.btn { text-decoration: none; }
 @container (min-width: 496px) { .avatar-opt:nth-child(-n + 14) { display: block; } .avatar-opt:nth-child(n + 15) { display: none; } } /* 7 cols → 14 */
 
 /* Lime flag must beat the dark-theme glass rule. */
-.glass-btn.pin-btn, :root[data-theme='dark'] 
+.glass-btn.pin-btn, :root[data-theme='dark'] /* fade the map in once SPATREN's colours are on it (no flash of the stock light style) */
+.maplibregl-canvas { opacity: 0; transition: opacity 0.35s var(--ease); }
+.maplibregl-canvas.painted { opacity: 1; }

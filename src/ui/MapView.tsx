@@ -82,8 +82,16 @@ export default function MapView({
       minZoom: 8,
       attributionControl: { compact: true },
     })
+    // The base style first renders in its own light colours; keep the canvas hidden until our palette is applied.
+    const reveal = () => m.getCanvas().classList.add('painted')
+    const failsafe = setTimeout(reveal, 5000)
     m.on('load', () => {
       paintCity(m, themeRef.current)
+      // two frames: the repaint with our palette lands first, then the canvas fades in
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        clearTimeout(failsafe)
+        reveal()
+      }))
       m.addSource('trail', { type: 'geojson', data: line([]) })
       const width = (a: number, b: number) => ['interpolate', ['linear'], ['zoom'], 12, a, 17, b] as unknown as number
       m.addLayer({ id: 'trail-casing', type: 'line', source: 'trail', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': width(5, 13) } })
