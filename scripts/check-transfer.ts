@@ -35,6 +35,7 @@ assert.equal(manifest.records.length, 2)
 assert.deepEqual(manifest.records[0].location, { lat: 8.35, lng: 80.39, accuracy_m: 6 })
 assert.equal(manifest.records[1].form_title, 'Open interview')
 assert.deepEqual(manifest.records[1].answers, { topic: 'Culture' })
+assert.equal(manifest.records[0].interview, undefined) // only interviews carry interview details
 assert.equal(manifest.records[1].audio[0].file, 'audio/20261111-1535_survey_bbbbbbbb_voice.m4a')
 
 console.info('recordings export: all checks passed')

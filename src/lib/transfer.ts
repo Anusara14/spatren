@@ -53,6 +53,10 @@ export async function buildRecordingsZip(records: LocalRecord[], who: ExportWho,
       location: r.lat != null ? { lat: r.lat, lng: r.lng, accuracy_m: r.accuracy } : null,
       answers: r.kind === 'survey' ? r.data.answers ?? {} : undefined,
       consent: r.data.consent ?? undefined,
+      // Open interviews: what the desktop app needs to line questions up with the audio.
+      interview: r.kind === 'interview'
+        ? { open: r.data.open === true, topic: r.data.topic ?? null, participants: r.data.participants ?? null, audio_seconds: r.data.audio_seconds ?? null, asked: r.data.asked ?? [] }
+        : undefined,
       audio: entries,
     })
   }

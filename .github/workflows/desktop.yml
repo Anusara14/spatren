@@ -1,0 +1,51 @@
+# Builds SPATREN Desktop for Windows and macOS (Apple Silicon) on GitHub's free runners.
+# Run it from the Actions tab ("Run workflow"); installers appear as downloadable artifacts.
+# whisper.cpp is compiled from source here (pinned tag), so no prebuilt binaries are trusted.
+name: Desktop app
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['desktop-v*']
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            cli: whisper-cli.exe
+          - os: macos-latest
+            cli: whisper-cli
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Build whisper.cpp (static, from source)
+        shell: bash
+        run: |
+          git clone --depth 1 --branch v1.9.5 https://github.com/ggml-org/whisper.cpp.git ../whisper.cpp
+          cmake -S ../whisper.cpp -B ../whisper-build -DBUILD_SHARED_LIBS=OFF -DWHISPER_BUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release
+          cmake --build ../whisper-build --config Release --target whisper-cli -j 4
+          mkdir -p desktop/src-tauri/bin
+          cp "$(find ../whisper-build -name '${{ matrix.cli }}' -type f | head -1)" desktop/src-tauri/bin/
+
+      - name: Install front end
+        working-directory: desktop
+        run: npm ci
+
+      - name: Build installer
+        working-directory: desktop
+        run: npx tauri build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: spatren-desktop-${{ matrix.os }}
+          path: |
+            desktop/src-tauri/target/release/bundle/nsis/*.exe
+            desktop/src-tauri/target/release/bundle/dmg/*.dmg

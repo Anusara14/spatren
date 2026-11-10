@@ -1,0 +1,38 @@
+/* Desktop layout: top bar, recordings list on the left, the open recording on the right. */
+html, body, #root { height: 100%; }
+body { overflow: hidden; }
+.d-shell { display: grid; grid-template-rows: auto auto 1fr; height: 100%; }
+.d-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 20px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.d-brand { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: 0.1em; }
+.d-brand span { font-weight: 500; letter-spacing: 0; color: var(--ink-3); }
+.d-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.d-status { display: flex; justify-content: space-between; gap: 12px; padding: 8px 20px; font-size: 13px; background: var(--surface-2); border-bottom: 1px solid var(--line); }
+.d-status.error { color: #f3a39d; }
+.d-status.ok { color: #d7e77a; }
+.d-body { display: grid; grid-template-columns: minmax(280px, 360px) 1fr; min-height: 0; }
+.d-list { display: flex; flex-direction: column; gap: 8px; padding: 14px; overflow-y: auto; border-right: 1px solid var(--line); }
+.d-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.d-chips .chip, .d-asked .chip { border: 0; cursor: pointer; }
+.d-row {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px; text-align: left; padding: 10px 12px; border-radius: var(--r-sm);
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+}
+.d-row b { font-size: 14px; }
+.d-row span { font-size: 12px; color: var(--ink-3); }
+.d-row .chip { font-size: 11px; }
+.d-row.sel { border-color: var(--lime); box-shadow: inset 0 0 0 1px var(--lime); }
+.d-main { overflow-y: auto; min-height: 0; }
+.d-view { display: flex; flex-direction: column; gap: 16px; padding: 22px 28px 40px; max-width: 980px; }
+.d-view h1 { font-size: 26px; letter-spacing: -0.02em; }
+.d-asked { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.d-seg { display: grid; grid-template-columns: 64px 1fr; gap: 10px; align-items: start; padding: 4px; border-radius: 10px; }
+.d-seg.active { background: var(--lime-wash); }
+.d-time { border: 0; background: none; color: var(--ink-3); font-variant-numeric: tabular-nums; padding: 8px 0; text-align: left; }
+.d-time:hover { color: var(--ink); }
+.d-text {
+  width: 100%; resize: vertical; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--ink);
+  font: 16px/1.55 'Noto Sans Sinhala', var(--font); padding: 6px 8px;
+}
+.d-text:focus { outline: none; border-color: var(--line); background: var(--surface-2); }
+.d-empty { padding: 18px; border: 1.5px dashed var(--line); border-radius: var(--r-md); color: var(--ink-3); font-size: 14px; }
+.d-empty.big { margin: 40px; text-align: center; }
