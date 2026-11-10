@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { db, type LocalRecord } from '../lib/db'
 import { clock } from '../lib/geo'
 import type { Profile } from '../lib/supabase'
+import { IS_NATIVE, shareFile } from '../lib/native'
 import { buildRecordingsZip } from '../lib/transfer'
 import { IconBack, IconUpload } from './icons'
 
@@ -46,7 +47,13 @@ export default function Transfer({ records, onBack, onToast }: Props) {
       })
       const file = new File([res.bytes as Uint8Array<ArrayBuffer>], res.fileName, { type: 'application/zip' })
       let sent = false
-      if (navigator.canShare?.({ files: [file] })) {
+      if (IS_NATIVE) {
+        sent = await shareFile(res.bytes, res.fileName, 'SPATREN recordings')
+        if (!sent) {
+          setBusy(false)
+          return // closed the share sheet: nothing was sent
+        }
+      } else if (navigator.canShare?.({ files: [file] })) {
         try {
           await navigator.share({ files: [file], title: 'SPATREN recordings' })
           sent = true
@@ -116,7 +123,7 @@ export default function Transfer({ records, onBack, onToast }: Props) {
           <ol className="steps">
             <li>Tap Send above. The share sheet opens.</li>
             <li>Choose <b>LocalSend</b> (free app, same Wi-Fi) or <b>Quick Share</b> to send to the laptop.</li>
-            <li>No laptop nearby? The file is also saved to Downloads; send it later.</li>
+            <li>No laptop nearby? Choose <b>Files</b> or <b>Drive</b> to keep a copy and send it later.</li>
           </ol>
         )}
         <p className="tiny muted">Get LocalSend free from localsend.org on the phone and the laptop.</p>

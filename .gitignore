@@ -6,3 +6,8 @@ dev-dist
 .vercel
 .claude
 *.log
+
+# Android signing keys: keep offline, never commit
+*.jks
+*.keystore
+keystore.properties

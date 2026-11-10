@@ -1,3 +1,5 @@
+import { IS_NATIVE, shareFile } from '../lib/native'
+
 export function csvCell(v: unknown): string {
   if (v == null) return ''
   let s = String(v)
@@ -6,6 +8,7 @@ export function csvCell(v: unknown): string {
 }
 
 export function download(name: string, content: string, type: string): void {
+  if (IS_NATIVE) return void shareFile(new TextEncoder().encode(content), name, name).catch(() => undefined)
   const url = URL.createObjectURL(new Blob([content], { type }))
   const a = Object.assign(document.createElement('a'), { href: url, download: name })
   a.click()

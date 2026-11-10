@@ -7,9 +7,19 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "check": "node scripts/check-forms.ts && node scripts/check-transfer.ts"
+    "check": "node scripts/check-forms.ts && node scripts/check-transfer.ts",
+    "android": "npm run build && cap sync android",
+    "apk": "npm run android && cd android && gradlew.bat assembleDebug"
   },
   "dependencies": {
+    "@capacitor-community/background-geolocation": "^1.3.1",
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/browser": "^8.0.5",
+    "@capacitor/core": "^8.6.0",
+    "@capacitor/filesystem": "^8.1.5",
+    "@capacitor/local-notifications": "^8.3.1",
+    "@capacitor/share": "^8.0.3",
     "@supabase/supabase-js": "^2.119.0",
     "dexie": "^4.4.7",
     "fflate": "^0.8.3",
@@ -18,6 +28,7 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.6.0",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^6.3.0",

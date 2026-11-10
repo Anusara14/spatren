@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { groupColor } from '../lib/geo'
-import { askNotificationPermission } from '../lib/meeting'
+import { askNotificationPermission, notificationState } from '../lib/meeting'
+import { oauthRedirect, openOAuth } from '../lib/native'
 import { avatarUrl, nameOf, supabase, type Profile } from '../lib/supabase'
 import { stopTracking } from '../lib/tracking'
 import { IconClose, IconGoogle, IconSync } from './icons'
@@ -20,7 +21,8 @@ export default function ProfileSheet({ profile, onClose, onChanged }: Props) {
   const [kind, setKind] = useState<'password' | 'google' | 'anonymous' | null>(null)
   const [pw, setPw] = useState('')
   const [pwMsg, setPwMsg] = useState<string | null>(null)
-  const [notif, setNotif] = useState(typeof Notification !== 'undefined' ? Notification.permission : 'denied')
+  const [notif, setNotif] = useState<string>('default')
+  useEffect(() => void notificationState().then(setNotif), [])
 
   useEffect(() => {
     void supabase.auth.getUser().then(({ data }) => {
@@ -94,7 +96,7 @@ export default function ProfileSheet({ profile, onClose, onChanged }: Props) {
           {notif === 'granted' ? (
             <p className="small muted">On. Meeting calls and alerts can reach you while the app is in the background.</p>
           ) : (
-            <button className="btn btn-ghost btn-sm" onClick={() => void askNotificationPermission().then(() => setNotif(Notification.permission))}>
+            <button className="btn btn-ghost btn-sm" onClick={() => void askNotificationPermission().then(setNotif)}>
               Turn on notifications
             </button>
           )}
@@ -111,7 +113,7 @@ export default function ProfileSheet({ profile, onClose, onChanged }: Props) {
           )}
           {pwMsg && <p className="small muted">{pwMsg}</p>}
           {kind === 'anonymous' && (
-            <button className="btn google-btn btn-sm" onClick={() => void supabase.auth.linkIdentity({ provider: 'google', options: { redirectTo: window.location.origin } })}>
+            <button className="btn google-btn btn-sm" onClick={() => void supabase.auth.linkIdentity({ provider: 'google', options: oauthRedirect() }).then(({ data }) => openOAuth(data?.url))}>
               <IconGoogle /> Link a Google account
             </button>
           )}

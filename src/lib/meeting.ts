@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { IS_NATIVE, nativeNotifState, nativeNotify, type NotifState } from './native'
 import { supabase } from './supabase'
 
 export interface MeetingPoint {
@@ -28,6 +29,7 @@ function readJson<T>(key: string, fallback: T): T {
 export async function notify(title: string, body: string, tag: string): Promise<void> {
   try {
     navigator.vibrate?.([300, 120, 300])
+    if (IS_NATIVE) return await nativeNotify(title, body)
     if (!('Notification' in window) || Notification.permission !== 'granted') return
     const reg = await navigator.serviceWorker?.ready
     if (reg) await reg.showNotification(title, { body, tag, icon: '/icon.svg', badge: '/icon.svg', requireInteraction: true })
@@ -37,12 +39,20 @@ export async function notify(title: string, body: string, tag: string): Promise<
   }
 }
 
-export async function askNotificationPermission(): Promise<void> {
+/** Current notification permission; `ask` prompts if it hasn't been decided yet. */
+export async function notificationState(ask = false): Promise<NotifState> {
   try {
-    if ('Notification' in window && Notification.permission === 'default') await Notification.requestPermission()
+    if (IS_NATIVE) return await nativeNotifState(ask)
+    if (!('Notification' in window)) return 'denied'
+    if (ask && Notification.permission === 'default') await Notification.requestPermission()
+    return Notification.permission
   } catch {
-    /* ignore */
+    return 'denied'
   }
+}
+
+export async function askNotificationPermission(): Promise<NotifState> {
+  return notificationState(true)
 }
 
 /** Active meeting points for this person (their group or everyone), live + cached for offline. */

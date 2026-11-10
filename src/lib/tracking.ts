@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { db, type PendingPoint } from './db'
 import { distanceMeters } from './geo'
+import { BackgroundGeolocation, IS_NATIVE } from './native'
 import { supabase } from './supabase'
 import { markStopPending, syncNow } from './sync'
 
@@ -31,6 +32,7 @@ type BatteryLike = { level: number; charging: boolean }
 let state: TrackerState = { active: false, fix: null, error: null, wakeLock: false, battery: null }
 const listeners = new Set<(s: TrackerState) => void>()
 let watchId: number | null = null
+let nativeWatcher: string | null = null // Android app: foreground-service watcher (keeps going with the screen off)
 let heartbeat: number | null = null
 let wakeLock: WakeLockSentinel | null = null
 let lastSaved: { t: number; lat: number; lng: number } | null = null
@@ -84,17 +86,14 @@ function onVisibility(): void {
   }
 }
 
-async function onPosition(p: GeolocationPosition): Promise<void> {
-  const fix: Fix = {
-    lat: p.coords.latitude,
-    lng: p.coords.longitude,
-    accuracy: Math.round(p.coords.accuracy),
-    at: new Date(p.timestamp).toISOString(),
-  }
+const onPosition = (p: GeolocationPosition): Promise<void> =>
+  onFix({ lat: p.coords.latitude, lng: p.coords.longitude, accuracy: Math.round(p.coords.accuracy), at: new Date(p.timestamp).toISOString() })
+
+async function onFix(fix: Fix): Promise<void> {
   set({ fix, error: null, battery: battery ? Math.round(battery.level * 100) : null })
   if (fix.accuracy > MAX_ACCURACY_M) return
 
-  const now = p.timestamp
+  const now = new Date(fix.at).getTime()
   const moved = lastSaved ? distanceMeters(lastSaved, fix) : Infinity
   if (lastSaved && now - lastSaved.t < SAVE_EVERY_MS && moved < SAVE_MIN_MOVE_M) return
   lastSaved = { t: now, lat: fix.lat, lng: fix.lng }
@@ -136,15 +135,38 @@ export async function startTracking(): Promise<void> {
   localStorage.setItem(KEY, '1')
   await readBattery()
   if (!wanted) return // stopped while we were waiting
-  watchId = navigator.geolocation.watchPosition((p) => void onPosition(p), onError, {
-    enableHighAccuracy: true,
-    maximumAge: 10_000,
-    timeout: 60_000,
-  })
+  if (IS_NATIVE) {
+    try {
+      const id = await BackgroundGeolocation.addWatcher(
+        { backgroundTitle: 'SPATREN is sharing your location', backgroundMessage: 'Field Mode is on. Stop it from the app.', requestPermissions: true, stale: false },
+        (loc, err) => {
+          if (err) {
+            set({ error: err.code === 'NOT_AUTHORIZED' ? 'Location permission denied. Allow location for SPATREN in Settings.' : 'Waiting for GPS…' })
+            if (err.code === 'NOT_AUTHORIZED') void BackgroundGeolocation.openSettings()
+            return
+          }
+          if (loc) void onFix({ lat: loc.latitude, lng: loc.longitude, accuracy: Math.round(loc.accuracy), at: new Date(loc.time ?? Date.now()).toISOString() })
+        },
+      )
+      if (!wanted) return void BackgroundGeolocation.removeWatcher({ id })
+      nativeWatcher = id
+    } catch {
+      wanted = false
+      localStorage.removeItem(KEY)
+      set({ error: 'Could not start location. Turn on Location in your phone settings.' })
+      return
+    }
+  } else {
+    watchId = navigator.geolocation.watchPosition((p) => void onPosition(p), onError, {
+      enableHighAccuracy: true,
+      maximumAge: 10_000,
+      timeout: 60_000,
+    })
+  }
   // Some phones only report on movement; poll so a stationary student still shows as live.
   heartbeat = window.setInterval(() => {
     const age = state.fix ? Date.now() - new Date(state.fix.at).getTime() : Infinity
-    if (age > SAVE_EVERY_MS) {
+    if (age > SAVE_EVERY_MS && !IS_NATIVE) {
       navigator.geolocation.getCurrentPosition((p) => void onPosition(p), onError, {
         enableHighAccuracy: true,
         maximumAge: 5_000,
@@ -159,7 +181,7 @@ export async function startTracking(): Promise<void> {
   set({ active: true })
   localStorage.removeItem('spatren.stopPending') // a newer start wins over an un-sent stop
   void supabase.rpc('set_tracking', { p_on: true })
-  await acquireWakeLock()
+  if (!IS_NATIVE) await acquireWakeLock() // the Android app tracks with the screen off; the web needs it on
   if (!wanted) return void stopTracking()
   void db.trail.where('recorded_at').below(new Date(Date.now() - TRAIL_KEEP_MS).toISOString()).delete()
 }
@@ -168,6 +190,8 @@ export async function stopTracking(): Promise<void> {
   wanted = false
   ticks = 0
   if (watchId !== null) navigator.geolocation.clearWatch(watchId)
+  if (nativeWatcher !== null) void BackgroundGeolocation.removeWatcher({ id: nativeWatcher })
+  nativeWatcher = null
   if (heartbeat !== null) clearInterval(heartbeat)
   watchId = heartbeat = null
   lastSaved = null

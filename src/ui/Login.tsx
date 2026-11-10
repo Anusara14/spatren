@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { oauthRedirect, openOAuth } from '../lib/native'
 import { emailForIndex, supabase } from '../lib/supabase'
 import { IconGoogle } from './icons'
 import InstallHint, { IS_IOS, IS_STANDALONE } from './InstallHint'
@@ -37,11 +38,14 @@ export default function Login() {
   async function google() {
     setBusy(true)
     setError(null)
-    const { error } = await supabase.auth.signInWithOAuth({
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: window.location.origin, queryParams: { prompt: 'select_account' } },
+      options: { ...oauthRedirect(), queryParams: { prompt: 'select_account' } },
     })
-    if (error) {
+    if (!error) {
+      await openOAuth(data.url) // Android app: Custom Tab; returns via lk.spatren.field://auth
+      setBusy(false)
+    } else {
       setError(navigator.onLine ? friendly(error.message) : 'You are offline. Connect once to sign in; after that the app works offline.')
       setBusy(false)
     }

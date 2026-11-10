@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { sosAlarm } from './alarm'
+import { askNotificationPermission } from './meeting'
 import { nameOf, supabase, type Profile, type SosRow } from './supabase'
 
 export interface Mate {
@@ -89,7 +90,7 @@ export function useTeam(profile: Profile): TeamFeed {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'sos_alerts' }, () => void loadAlerts())
         .on('postgres_changes', { event: '*', schema: 'public', table: 'members' }, () => void loadMates())
         .subscribe((s) => s === 'SUBSCRIBED' && reload())
-      if ('Notification' in window && Notification.permission === 'default') void Notification.requestPermission()
+      void askNotificationPermission()
     }
     return () => {
       clearInterval(poll)
