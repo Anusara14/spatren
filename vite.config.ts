@@ -2,8 +2,14 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
+// Build number (minutes since 1970): baked into the code and into dist/build.txt so scripts/ota.mjs can publish the
+// Android over-the-air update under the same number. The app updates when the published number is higher than its own.
+const BUILD = Math.floor(Date.now() / 60_000)
+
 export default defineConfig({
+  define: { __BUILD__: JSON.stringify(BUILD) },
   plugins: [
+    { name: 'spatren-build-number', generateBundle() { this.emitFile({ type: 'asset', fileName: 'build.txt', source: String(BUILD) }) } },
     react(),
     VitePWA({
       registerType: 'autoUpdate',

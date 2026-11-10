@@ -9,6 +9,7 @@ import Field from './ui/Field'
 import { IconChart, IconField, IconPlus, IconShield } from './ui/icons'
 import Login from './ui/Login'
 import { Mark } from './ui/Theme'
+import UpdateBanner from './ui/UpdateBanner'
 
 // Code-split: the map engine, Collect and Admin load on first use (all precached by the service worker for offline).
 const Admin = lazy(() => import('./ui/Admin'))
@@ -77,6 +78,7 @@ export default function App() {
 
   return (
     <div className="shell">
+      <UpdateBanner />
       <nav className="tabbar" aria-label="Main">
         <Mark className="rail-logo" size={40} />
         {tabs

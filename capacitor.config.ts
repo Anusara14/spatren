@@ -5,7 +5,11 @@ const config: CapacitorConfig = {
   appName: 'SPATREN',
   webDir: 'dist',
   android: { backgroundColor: '#000000' },
-  plugins: { LocalNotifications: { iconColor: '#BED43D' } },
+  plugins: {
+    LocalNotifications: { iconColor: '#BED43D' },
+    // Self-hosted updates (see src/lib/updates.ts): no Capgo cloud, no stats sent anywhere.
+    CapacitorUpdater: { autoUpdate: false, statsUrl: '', updateUrl: '', channelUrl: '', appReadyTimeout: 15000, autoDeletePrevious: true, resetWhenUpdate: true },
+  },
 }
 
 export default config

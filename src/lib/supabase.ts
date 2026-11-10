@@ -1,11 +1,14 @@
 import { createClient } from '@supabase/supabase-js'
+import { IS_NATIVE } from './native'
 
 const url = import.meta.env.VITE_SUPABASE_URL as string
 const key = import.meta.env.VITE_SUPABASE_KEY as string
 if (!url || !key) throw new Error('Missing VITE_SUPABASE_URL / VITE_SUPABASE_KEY')
 
 export const supabase = createClient(url, key, {
-  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+  // Android app: PKCE, so the sign-in deep link only works for a sign-in this phone started (a crafted
+  // lk.spatren.field://auth link can't log a student into someone else's account). Web keeps its working flow.
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: !IS_NATIVE, flowType: IS_NATIVE ? 'pkce' : 'implicit' },
 })
 
 export type Profile = {

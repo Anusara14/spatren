@@ -19,20 +19,29 @@ export async function openOAuth(url: string | null | undefined): Promise<void> {
   await Browser.open({ url })
 }
 
-/** Android app: finish Google sign-in when the Custom Tab hands back lk.spatren.field://auth#access_token=… */
+/** Android app: finish Google sign-in when the Custom Tab hands back lk.spatren.field://auth?code=… (PKCE). */
 export async function listenForAuthReturn(): Promise<void> {
   if (!IS_NATIVE) return
   const [{ App }, { Browser }, { supabase }] = await Promise.all([import('@capacitor/app'), import('@capacitor/browser'), import('./supabase')])
   await App.addListener('appUrlOpen', ({ url }) => {
     if (!url.startsWith(NATIVE_AUTH_REDIRECT)) return
     void Browser.close().catch(() => undefined)
-    const [beforeHash, hash = ''] = url.split('#')
-    const p = new URLSearchParams(`${beforeHash.split('?')[1] ?? ''}&${hash}`)
-    const access = p.get('access_token')
-    const refresh = p.get('refresh_token')
-    const code = p.get('code')
-    if (access && refresh) void supabase.auth.setSession({ access_token: access, refresh_token: refresh })
-    else if (code) void supabase.auth.exchangeCodeForSession(code)
+    // Only a PKCE code is accepted: it can be exchanged only with the verifier this phone stored when sign-in began.
+    const code = new URLSearchParams(url.split('#')[0].split('?')[1] ?? '').get('code')
+    if (code) void supabase.auth.exchangeCodeForSession(code)
+  })
+
+  // Hardware Back: close the top sheet, leave the open form or screen, go back to the map, else send the app to the
+  // background (never quit it, so Field Mode keeps tracking).
+  await App.addListener('backButton', () => {
+    const last = <T extends Element>(sel: string) => [...document.querySelectorAll<T>(sel)].pop()
+    const target =
+      last<HTMLElement>('.sheet-backdrop') ??
+      last<HTMLElement>('button[aria-label^="Close survey"]') ??
+      last<HTMLElement>('button[aria-label^="Back"]') ??
+      document.querySelector<HTMLElement>('.tabbar button:first-of-type:not([aria-current])')
+    if (target) target.click()
+    else void App.minimizeApp()
   })
 }
 

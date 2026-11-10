@@ -106,7 +106,9 @@ async function syncRecord(uid: string, rec: LocalRecord): Promise<void> {
     if (m.uploaded) continue
     // Voice recordings never go to the cloud (storage budget + privacy). They stay on the phone and leave via
     // Collect → Transfer recordings. The record still syncs, pointing at the file on the device.
-    if (m.type.startsWith('audio')) {
+    // Anything the server won't take (only JPEG/PNG/WebP/HEIC photos are allowed) also stays here instead of
+    // blocking the record in "Ready to send" forever.
+    if (!/^image\/(jpeg|png|webp|heic)$/.test(m.type.split(';')[0])) {
       media[i] = { ...m, uploaded: `device://${rec.id}/${m.name}` }
       await db.records.update(rec.id, { media })
       continue
