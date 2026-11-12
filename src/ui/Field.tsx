@@ -1,13 +1,15 @@
 import { liveQuery } from 'dexie'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { db } from '../lib/db'
-import { ago, clock, distanceMeters, formatDistance, freshness, groupColor, GROUP_COLORS, mapsLink } from '../lib/geo'
+import { ago, clock, distanceMeters, formatDistance, freshness, groupColor, groupsOf, mapsLink, regionFor } from '../lib/geo'
+import { ratingCounts, ratingOf, useExperiences, type Experience, type ExperienceRange } from '../lib/experience'
 import { askNotificationPermission, useMeetingPoints, type MeetingPoint } from '../lib/meeting'
 import { avatarUrl, nameOf, supabase, type Profile } from '../lib/supabase'
 import { syncNow, useOnline, useOutbox } from '../lib/sync'
-import { useTeam } from '../lib/team'
+import { useTeam, type Mate } from '../lib/team'
 import { startTracking, stopTracking, useTracker } from '../lib/tracking'
-import { IconClose, IconFlag, IconPlus, IconSync, IconUsers } from './icons'
+import { IconClose, IconFlag, IconPlus, IconSearch, IconSmile, IconSync, IconUsers } from './icons'
+import { ExperienceSheet, FindPanel } from './MapTools'
 import { lazy, Suspense } from 'react'
 import type { MapMarker } from './MapView'
 import InstallHint from './InstallHint'
@@ -46,6 +48,15 @@ export default function Field({ profile, onRecord, onProfileChange }: FieldProps
   const pickCenter = useRef<{ lat: number; lng: number } | null>(null)
   const [dismissed, setDismissed] = useState<string[]>([])
   const [syncing, setSyncing] = useState(false)
+  const [finding, setFinding] = useState(false)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [expOn, setExpOn] = useState(false)
+  const [expRange, setExpRange] = useState<ExperienceRange>('today')
+  const [expSel, setExpSel] = useState<Experience | null>(null)
+  const exps = useExperiences(expOn, expRange)
+  const region = useMemo(() => regionFor(profile.batch_place), [profile.batch_place])
+  const canPin = profile.is_admin || (!!profile.is_leader && !!profile.grp)
   const [, tick] = useState(0)
 
   useEffect(() => {
@@ -72,7 +83,7 @@ export default function Field({ profile, onRecord, onProfileChange }: FieldProps
   const show = (lat: number, lng: number) => setFocus({ lat, lng, zoom: 17, key: `${lat},${lng},${Date.now()}` })
   const sosUsers = useMemo(() => new Set(team.alerts.filter((a) => a.status === 'open').map((a) => a.user_id)), [team.alerts])
 
-  const markers: MapMarker[] = team.mates
+  const people: MapMarker[] = team.mates
     .filter((m) => m.user_id !== myUid && m.lat != null && m.lng != null)
     .map((m) => ({
       id: m.user_id,
@@ -82,9 +93,30 @@ export default function Field({ profile, onRecord, onProfileChange }: FieldProps
       label: initials(nameOf(m)),
       name: nameOf(m),
       avatar: avatarUrl(m.avatar),
-      className: `${freshness(m)} ${sosUsers.has(m.user_id) ? 'mk-sos' : ''}`,
-      title: `${nameOf(m)} · ${m.grp} ${m.subgroup} · ${ago(m.recorded_at)}`,
+      className: `${freshness(m)} ${sosUsers.has(m.user_id) ? 'mk-sos' : ''} ${m.is_leader ? 'mk-leader' : ''}`,
+      title: `${nameOf(m)}${m.is_leader ? ' (leader)' : ''} · ${[m.grp, m.subgroup].filter(Boolean).join(' ')} · ${ago(m.recorded_at)}`,
     }))
+  // Experience pins: coloured by rating, prefixed ids so a tap opens the experience instead of the team.
+  const expMarkers: MapMarker[] = expOn
+    ? exps.items.filter((x) => x.lat != null && x.lng != null).map((x) => {
+        const r = ratingOf(x.rating)
+        return { id: `exp:${x.id}`, lat: x.lat!, lng: x.lng!, color: r?.color ?? '#9AA5B1', label: r?.emoji ?? '•', className: 'mk-exp', title: `${r?.label ?? 'Experience'} · ${x.title ?? ''} · ${x.author ?? ''}` }
+      })
+    : []
+  const markers = [...people, ...expMarkers]
+
+  function findPerson(m: Mate) {
+    setFinding(false)
+    if (m.lat == null || m.lng == null) return setNotice(`${nameOf(m)} hasn't shared a location yet.`)
+    setSelectedId(m.user_id)
+    setFocus({ lat: m.lat, lng: m.lng, zoom: 18, key: `find-${m.user_id}-${Date.now()}` })
+    setNotice(`${nameOf(m)} · ${freshness(m) === 'live' ? 'live now' : `last seen ${ago(m.recorded_at)}`}`)
+  }
+  useEffect(() => {
+    if (!notice) return
+    const id = setTimeout(() => setNotice(null), 4000)
+    return () => clearTimeout(id)
+  }, [notice])
 
   const pending = outbox.points + outbox.sos + outbox.records
   const status = t.active ? (t.fix ? `Sharing · ±${t.fix.accuracy} m · ${ago(t.fix.at)}` : 'Finding GPS…') : 'Field Mode off'
@@ -116,7 +148,13 @@ export default function Field({ profile, onRecord, onProfileChange }: FieldProps
       <MapView
         me={t.fix}
         markers={markers}
-        onSelect={() => setSheet('team')}
+        selectedId={selectedId}
+        region={region}
+        onSelect={(id) => {
+          if (id.startsWith('exp:')) return setExpSel(exps.items.find((x) => `exp:${x.id}` === id) ?? null)
+          setSelectedId(id)
+          setSheet('team')
+        }}
         trail={otherTrail ?? trail}
         focus={focus}
         meetingPoints={meeting}
@@ -126,8 +164,8 @@ export default function Field({ profile, onRecord, onProfileChange }: FieldProps
         topControl={
           <>
             <Sos name={`${nameOf(profile)} (${profile.index_no ?? ''})`} variant="fab" />
-            {profile.is_admin && !picking && (
-              <button className="glass-btn pin-btn" aria-label="Drop a meeting pin" title="Drop a meeting pin" onClick={startPick}>
+            {canPin && !picking && (
+              <button className="glass-btn pin-btn" aria-label={profile.is_admin ? 'Drop a meeting pin' : 'Call my group to a meeting pin'} title="Drop a meeting pin" onClick={startPick}>
                 <IconFlag />
               </button>
             )}
@@ -137,12 +175,18 @@ export default function Field({ profile, onRecord, onProfileChange }: FieldProps
       </Suspense>
 
       <header className="title-overlay">
-        <h1>Anuradhapura</h1>
-        <p>Hi {nameOf(profile)} · {profile.is_admin ? 'Coordinator' : profile.subgroup}</p>
+        <h1>{profile.batch_place || 'Field visit'}</h1>
+        <p>Hi {nameOf(profile)} · {profile.is_admin ? 'Coordinator' : profile.is_leader ? `${profile.grp ?? 'Group'} leader` : profile.subgroup ?? profile.grp ?? ''}</p>
         <div className="row" style={{ gap: 6, marginTop: 12, flexWrap: 'wrap' }}>
           <button className="chip glass-chip chip-btn" onClick={() => setSheet('team')}>
             <IconUsers width={15} height={15} />
-            {profile.is_admin ? 'Team' : profile.grp} · {liveMates} live
+            {profile.is_admin ? 'Team' : profile.grp ?? 'My group'} · {liveMates} live
+          </button>
+          <button className="chip glass-chip chip-btn" aria-label="Find someone on the map" onClick={() => setFinding(true)}>
+            <IconSearch width={15} height={15} /> Find
+          </button>
+          <button className={`chip glass-chip chip-btn ${expOn ? 'chip-on' : ''}`} aria-pressed={expOn} onClick={() => setExpOn((v) => !v)}>
+            <IconSmile width={15} height={15} /> Experiences{expOn ? ` · ${exps.items.length}` : ''}
           </button>
           {!online && <span className="chip glass-chip"><span className="dot offline" />Offline</span>}
           {pending > 0 && <span className="chip glass-chip">{pending} to upload</span>}
@@ -159,7 +203,7 @@ export default function Field({ profile, onRecord, onProfileChange }: FieldProps
           <div className="grow">
             <b>SOS · {nameOf(alertWho)}</b>
             <p>
-              {alertWho ? `${alertWho.grp} · ${alertWho.subgroup} · ` : ''}sent {clock(openAlert.created_at)} ({ago(openAlert.created_at)})
+              {alertWho ? [alertWho.grp, alertWho.subgroup].filter(Boolean).map((x) => `${x} · `).join('') : ''}sent {clock(openAlert.created_at)} ({ago(openAlert.created_at)})
               {openAlert.battery != null ? ` · battery ${openAlert.battery}%` : ''}
               {openAlert.location_at ? ` · GPS ${ago(openAlert.location_at)}` : ' · no GPS'}
             </p>
@@ -191,7 +235,27 @@ export default function Field({ profile, onRecord, onProfileChange }: FieldProps
         </div>
       )}
 
-      {t.error && !picking && <p className="map-toast">{t.error}</p>}
+      {finding && <FindPanel mates={team.mates.filter((m) => m.user_id !== myUid)} onPick={findPerson} onClose={() => setFinding(false)} />}
+
+      {expOn && !picking && (
+        <div className="exp-legend glass" role="group" aria-label="Experience map">
+          <div className="exp-range segmented">
+            {([['today', 'Today'], ['3days', '3 days'], ['all', 'All']] as [ExperienceRange, string][]).map(([v, label]) => (
+              <button key={v} aria-pressed={expRange === v} onClick={() => setExpRange(v)}>{label}</button>
+            ))}
+          </div>
+          <div className="exp-counts">
+            {ratingCounts(exps.items).map(({ rating, count }) => (
+              <span key={rating.value} title={rating.label} style={{ ['--r' as string]: rating.color }}><i aria-hidden="true">{rating.emoji}</i>{count}</span>
+            ))}
+          </div>
+          {exps.error && <p className="tiny" style={{ color: 'var(--danger)' }}>{exps.error}</p>}
+          {!exps.error && !exps.items.length && <p className="tiny muted">No experiences yet. Share one from Collect, Share an experience.</p>}
+        </div>
+      )}
+
+      {notice && <p className="map-toast" role="status">{notice}</p>}
+      {t.error && !picking && !notice && <p className="map-toast">{t.error}</p>}
       {!picking && !openAlert && !banner && <div className="install-float"><InstallHint /></div>}
 
       {picking ? (
@@ -217,7 +281,11 @@ export default function Field({ profile, onRecord, onProfileChange }: FieldProps
           onShow={show} onTrail={setOtherTrail} onDropPin={startPick} />
       )}
       {sheet === 'profile' && <ProfileSheet profile={profile} onClose={() => setSheet(null)} onChanged={onProfileChange} />}
-      {sheet === 'meet' && draft && <MeetingForm at={draft} onClose={() => { setSheet(null); setDraft(null) }} onSent={(lat, lng) => show(lat, lng)} />}
+      {sheet === 'meet' && draft && (
+        <MeetingForm at={draft} groups={profile.is_admin ? groupsOf(team.mates) : null} myGroup={profile.grp}
+          onClose={() => { setSheet(null); setDraft(null) }} onSent={(lat, lng) => show(lat, lng)} />
+      )}
+      {expSel && <ExperienceSheet x={expSel} onClose={() => setExpSel(null)} />}
 
       {sheet === 'details' && (
         <div className="sheet-backdrop" onClick={() => setSheet(null)}>
@@ -253,11 +321,20 @@ export default function Field({ profile, onRecord, onProfileChange }: FieldProps
   )
 }
 
-function MeetingForm({ at, onClose, onSent }: { at: { lat: number; lng: number }; onClose: () => void; onSent: (lat: number, lng: number) => void }) {
+interface MeetingFormProps {
+  at: { lat: number; lng: number }
+  /** admins pick who to call (null for a group leader, who always calls their own group) */
+  groups: string[] | null
+  myGroup: string | null
+  onClose: () => void
+  onSent: (lat: number, lng: number) => void
+}
+
+function MeetingForm({ at, groups, myGroup, onClose, onSent }: MeetingFormProps) {
   const [title, setTitle] = useState('Meet here')
   const [note, setNote] = useState('')
   const [time, setTime] = useState('')
-  const [target, setTarget] = useState('')
+  const [target, setTarget] = useState(groups ? '' : myGroup ?? '')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
@@ -293,11 +370,15 @@ function MeetingForm({ at, onClose, onSent }: { at: { lat: number; lng: number }
         <input className="input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note (optional)" maxLength={500} />
         <div className="field">
           <label>Who should come</label>
-          <div className="segmented" role="radiogroup">
-            {['', ...Object.keys(GROUP_COLORS)].map((g) => (
-              <button type="button" key={g || 'all'} role="radio" aria-checked={target === g} aria-pressed={target === g} onClick={() => setTarget(g)}>{g ? g.replace('Group ', 'G') : 'Everyone'}</button>
-            ))}
-          </div>
+          {groups ? (
+            <div className="segmented seg-scroll" role="radiogroup">
+              {['', ...groups].map((g) => (
+                <button type="button" key={g || 'all'} role="radio" aria-checked={target === g} aria-pressed={target === g} onClick={() => setTarget(g)}>{g ? g.replace(/^Group\s*/i, 'G') : 'Everyone'}</button>
+              ))}
+            </div>
+          ) : (
+            <p className="small">Your group · {myGroup ?? 'no group'}</p>
+          )}
         </div>
         <div className="field">
           <label htmlFor="mt">Be there by (optional)</label>

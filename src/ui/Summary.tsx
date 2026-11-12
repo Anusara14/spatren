@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { batchMatch } from '../lib/batch'
 import { clock, groupColor } from '../lib/geo'
 import { nameOf, supabase, type RecordRow, type SosRow, type TeamRow } from '../lib/supabase'
 import { csvCell, download } from './export'
@@ -40,7 +41,7 @@ export default function Summary({ isAdmin = true }: { isAdmin?: boolean }) {
     const [from, to] = dayBounds(day)
     const none = Promise.resolve({ data: null })
     const [t, r, a, s] = await Promise.all([
-      isAdmin ? supabase.from('team_status').select('*') : none,
+      isAdmin ? supabase.from('team_status').select('*').match(batchMatch()) : none,
       supabase.from('records').select('*').gte('recorded_at', from).lt('recorded_at', to).order('recorded_at'),
       isAdmin ? supabase.rpc('activity_between', { p_from: from, p_to: to }) : none,
       isAdmin ? supabase.from('sos_alerts').select('*').gte('created_at', from).lt('created_at', to) : none,

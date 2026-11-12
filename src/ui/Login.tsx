@@ -9,7 +9,7 @@ import { StackedLogo } from './Theme'
 type Mode = 'login' | 'signup'
 
 const SIGNUP_MESSAGES: Record<string, string> = {
-  invalid_format: 'Index numbers look like 123456A: six digits and a capital letter.',
+  invalid_format: 'Type your index number with letters and numbers only, e.g. 242343J.',
   not_in_roster: "That index isn't on the class list. Check it, or ask the admin.",
   weak_password: 'Use a password of at least 6 characters.',
   already_claimed: 'That index is already linked to another account (maybe Google). Log in with that, or ask the admin to reset it.',
@@ -57,8 +57,8 @@ export default function Login() {
     e.preventDefault()
     setError(null)
     if (!navigator.onLine) return setError('You are offline. Connect once to sign in; after that the app works offline.')
-    const idx = index.trim().toUpperCase()
-    if (!/^\d{6}[A-Z]$/.test(idx)) return setError(SIGNUP_MESSAGES.invalid_format)
+    const idx = index.replace(/\s/g, '').toUpperCase()
+    if (!/^[A-Z0-9]{3,20}$/.test(idx)) return setError(SIGNUP_MESSAGES.invalid_format)
     if (mode === 'signup' && password !== confirm) return setError("The two passwords don't match.")
     setBusy(true)
     try {

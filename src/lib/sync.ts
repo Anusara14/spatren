@@ -108,13 +108,23 @@ async function syncRecord(uid: string, rec: LocalRecord): Promise<void> {
     // Collect → Transfer recordings. The record still syncs, pointing at the file on the device.
     // Anything the server won't take (only JPEG/PNG/WebP/HEIC photos are allowed) also stays here instead of
     // blocking the record in "Ready to send" forever.
-    if (!/^image\/(jpeg|png|webp|heic)$/.test(m.type.split(';')[0])) {
+    // Experiences are the exception: their short voice note is shared with the batch on the experience map.
+    const type = m.type.split(';')[0]
+    const isExperience = rec.kind === 'experience'
+    const allowed = /^image\/(jpeg|png|webp|heic)$/.test(type) || (isExperience && /^audio\/(webm|mp4|ogg|mpeg|aac)$/.test(type) && m.blob.size <= 8 * 1024 * 1024)
+    if (!allowed) {
       media[i] = { ...m, uploaded: `device://${rec.id}/${m.name}` }
       await db.records.update(rec.id, { media })
       continue
     }
-    const path = `${uid}/${rec.id}/${m.name}`
+    // media/<uid>/exp/... is readable by the whole batch; everything else stays private to the student and admins.
+    const path = isExperience ? `${uid}/exp/${rec.id}/${m.name}` : `${uid}/${rec.id}/${m.name}`
     const { error } = await supabase.storage.from('media').upload(path, m.blob, { contentType: m.type.split(';')[0], upsert: true })
+    if (error && isExperience && type.startsWith('audio')) {
+      media[i] = { ...m, uploaded: `device://${rec.id}/${m.name}` }
+      await db.records.update(rec.id, { media })
+      continue
+    }
     if (error) throw new Error(`Media upload failed: ${error.message}`)
     media[i] = { ...m, uploaded: path }
     await db.records.update(rec.id, { media })

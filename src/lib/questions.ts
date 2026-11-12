@@ -82,11 +82,12 @@ export interface QuestionSet {
 }
 
 /** Sets shown during an interview, the student's own theme first. */
-export function questionSets(theme: string | null, elective: string | null, probes: FollowUp[]): QuestionSet[] {
+export function questionSets(theme: string | null, elective: string | null, probes: FollowUp[], place: string | null = 'Anuradhapura'): QuestionSet[] {
   const sets: QuestionSet[] = []
   if (theme && BY_THEME[theme]) sets.push({ id: 'theme', label: theme, questions: BY_THEME[theme] })
   if (elective && BY_ELECTIVE[elective]) sets.push({ id: 'elective', label: elective, questions: BY_ELECTIVE[elective] })
-  sets.push({ id: 'common', label: 'Anuradhapura', questions: COMMON })
+  // The common set is about Anuradhapura; other batches' trips get the theme, elective and probe sets.
+  if (!place || /anuradhapura/i.test(place)) sets.push({ id: 'common', label: 'Anuradhapura', questions: COMMON })
   sets.push({ id: 'probes', label: 'Dig deeper', questions: probes })
   // Students without a theme (or the admin) can still browse every theme.
   if (!theme) for (const [t, qs] of Object.entries(BY_THEME)) sets.splice(sets.length - 2, 0, { id: `t-${t}`, label: t, questions: qs })

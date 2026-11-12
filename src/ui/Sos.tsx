@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { db } from '../lib/db'
 import { clock, mapsLink } from '../lib/geo'
-import { supabase } from '../lib/supabase'
+import { myBatch } from '../lib/batch'
 import { sendSos } from '../lib/sync'
 import { currentFix, getLastFix } from '../lib/tracking'
 
@@ -37,16 +37,13 @@ export default function Sos({ name, variant = 'bar' }: SosProps) {
   const start = useRef(0)
 
   useEffect(() => {
-    void supabase
-      .from('settings')
-      .select('coordinator_name, coordinator_phone')
-      .single()
-      .then(({ data }) => {
-        if (data) {
-          setCoord(data)
-          localStorage.setItem(COORD_KEY, JSON.stringify(data))
-        }
-      })
+    // This batch's emergency contact (each class sets its own in Admin).
+    void myBatch().then((b) => {
+      if (!b) return
+      const c = { coordinator_name: b.coordinator_name, coordinator_phone: b.coordinator_phone }
+      setCoord(c)
+      localStorage.setItem(COORD_KEY, JSON.stringify(c))
+    })
     // Keep retrying queued SOS every 10 s, independent of Field Mode and of any running sync.
     const retry = setInterval(() => void db.sos.count().then((n) => (n > 0 ? sendSos() : true)), 10_000)
     return () => clearInterval(retry)

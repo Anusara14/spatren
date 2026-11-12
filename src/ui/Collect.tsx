@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { db, type LocalRecord } from '../lib/db'
 import { flatQuestions } from '../lib/forms'
 import { clock } from '../lib/geo'
-import { supabase } from '../lib/supabase'
+import { friendlyError, supabase } from '../lib/supabase'
 import { syncNow, useOnline } from '../lib/sync'
 import Capture from './Capture'
 import OpenInterview from './OpenInterview'
@@ -11,12 +11,13 @@ import FormBuilder from './FormBuilder'
 import Transfer from './Transfer'
 import FormImport, { localForms, removeLocalForm } from './FormImport'
 import FormRunner, { type FormRow } from './FormRunner'
-import { IconBack, IconCheckCircle, IconChevrons, IconDownload, IconFilePlus, IconFormEdit, IconMic, IconNote, IconPencil, IconTrash, IconUpload, IconUsers } from './icons'
+import { downloadResponses, ShareFormSheet } from './ShareForm'
+import { IconBack, IconCheckCircle, IconChevrons, IconDownload, IconFilePlus, IconFormEdit, IconMic, IconNote, IconPencil, IconShare, IconSmile, IconTrash, IconUpload, IconUsers } from './icons'
 import { Mark } from './Theme'
 
 const FORMS_CACHE = 'spatren.forms'
 const draftKey = (id: string) => `spatren.draft.${id}`
-type View = 'home' | 'start' | 'drafts' | 'ready' | 'sent' | 'import' | 'quick' | 'build' | 'transfer' | 'interview'
+type View = 'home' | 'start' | 'drafts' | 'ready' | 'sent' | 'import' | 'quick' | 'build' | 'transfer' | 'interview' | 'experience'
 
 function cachedForms(): FormRow[] {
   try {
@@ -43,14 +44,18 @@ export default function Collect({ isAdmin }: { isAdmin: boolean }) {
   const unfinished = view === 'home' && localStorage.getItem('spatren.oi.live') !== null
   const [sending, setSending] = useState(false)
   const [editing, setEditing] = useState<FormRow | null>(null)
+  const [sharing, setSharing] = useState<FormRow | null>(null)
+  const [myUid, setMyUid] = useState<string | null>(null)
+  const [reloadForms, setReloadForms] = useState(0)
   const online = useOnline()
+  useEffect(() => void supabase.auth.getUser().then(({ data }) => setMyUid(data.user?.id ?? null)), [])
 
   useEffect(() => {
     // Published forms are cached so surveys start with no signal.
     const load = () =>
       void supabase
         .from('forms')
-        .select('id,title,version,definition')
+        .select('id,title,version,definition,scope,target_group,shared_with,owner_name,created_by')
         .eq('active', true)
         .order('created_at', { ascending: false })
         .then(({ data }) => {
@@ -61,7 +66,7 @@ export default function Collect({ isAdmin }: { isAdmin: boolean }) {
     load()
     const ch = supabase.channel('forms-live').on('postgres_changes', { event: '*', schema: 'public', table: 'forms' }, load).subscribe()
     return () => void supabase.removeChannel(ch)
-  }, [])
+  }, [reloadForms])
 
   useEffect(() => {
     const sub = liveQuery(() => db.records.orderBy('recorded_at').reverse().toArray()).subscribe({ next: setRecords })
@@ -81,6 +86,8 @@ export default function Collect({ isAdmin }: { isAdmin: boolean }) {
   const untransferred = records.filter((r) => !r.exported && r.media.some((m) => m.type.startsWith('audio'))).length
   const formTitle = (r: LocalRecord) => (r.kind === 'survey' ? String(r.data.form_title ?? 'Survey') : r.kind[0].toUpperCase() + r.kind.slice(1))
 
+  const isMineShared = (f: FormRow) => !!myUid && f.created_by === myUid && f.scope !== 'batch' && !f.id.startsWith('local-')
+
   async function sendAll() {
     setSending(true)
     const res = await syncNow()
@@ -99,18 +106,38 @@ export default function Collect({ isAdmin }: { isAdmin: boolean }) {
       />
     )
   if (view === 'quick') return <Capture onBack={() => setView('home')} />
+  if (view === 'experience') return <Capture initialKind="experience" onBack={() => setView('home')} />
   if (view === 'interview') return <><OpenInterview onBack={() => setView('home')} onToast={setToast} />{toast && <div className="toast">{toast}</div>}</>
   if (view === 'transfer') return <><Transfer records={records} onBack={() => setView('home')} onToast={setToast} />{toast && <div className="toast">{toast}</div>}</>
   if (view === 'build')
     return (
       <FormBuilder
-        isAdmin={isAdmin}
+        isAdmin={isAdmin || (!!editing && isMineShared(editing))}
         initial={editing?.definition}
-        localId={editing?.id}
+        localId={editing?.id.startsWith('local-') ? editing.id : undefined}
+        replacing={editing && !editing.id.startsWith('local-') ? { id: editing.id, version: editing.version } : null}
         onCancel={() => { setEditing(null); setView(editing ? 'start' : 'home') }}
         onDone={(m) => { setToast(m); setEditing(null); setLocal(localForms()); setView('start') }}
       />
     )
+
+  /** Where a form came from, in a few words. */
+  const origin = (f: FormRow) => {
+    if (f.id.startsWith('local-')) return 'On this phone only'
+    if (f.created_by && f.created_by === myUid && f.scope !== 'batch')
+      return f.scope === 'group' ? `You shared it with ${f.target_group ?? 'your group'}` : `You shared it with ${f.shared_with?.length ?? 0} classmate${f.shared_with?.length === 1 ? '' : 's'}`
+    if (f.scope === 'group') return `Shared by ${f.owner_name ?? 'a classmate'} with your group`
+    if (f.scope === 'people') return `Shared with you by ${f.owner_name ?? 'a classmate'}`
+    return `Team form v${f.version}`
+  }
+
+  async function stopSharing(f: FormRow) {
+    if (!confirm(`Stop sharing “${f.title}”? It disappears from your classmates' phones. Answers already sent are kept.`)) return
+    const { error } = await supabase.from('forms').delete().eq('id', f.id)
+    if (error) return setToast(friendlyError(error, 'stop sharing'))
+    setPublished((list) => list.filter((x) => x.id !== f.id))
+    setToast('Stopped sharing. You can share it again from a copy on this phone.')
+  }
 
   const back = (title: string, extra?: ReactNode) => (
     <header className="kc-sub">
@@ -137,6 +164,7 @@ export default function Collect({ isAdmin }: { isAdmin: boolean }) {
           <h2 className="kc-group">Collect</h2>
           <nav className="kc-menu" aria-label="Collect">
             <MenuItem icon={<IconUsers />} title="Open interview" sub={unfinished ? 'Unfinished interview: tap to save it' : 'Voice, question cards, AI follow-ups'} count={unfinished ? 1 : 0} warn onClick={() => setView('interview')} accent />
+            <MenuItem icon={<IconSmile />} title="Share an experience" sub="Rate a place: photo, voice, note" onClick={() => setView('experience')} />
             <MenuItem icon={<IconFilePlus />} title="Fill a form" sub={forms.length ? `${forms.length} ready` : 'None yet'} onClick={() => setView('start')} />
             <MenuItem icon={<IconNote />} title="Quick note" sub="Photo, voice or text" onClick={() => setView('quick')} />
           </nav>
@@ -167,11 +195,18 @@ export default function Collect({ isAdmin }: { isAdmin: boolean }) {
               <button className="kc-row-main" onClick={() => setOpen(f)}>
                 <b>{f.title}</b>
                 <span>
-                  {flatQuestions(f.definition).length} questions · {f.id.startsWith('local-') ? 'On this phone only' : `Team form v${f.version}`}
+                  {flatQuestions(f.definition).length} questions · {origin(f)}
+                  {f.definition.record_audio ? ' · records audio' : ''}
                   {hasDraft(f.id) ? ' · draft saved' : ''}
                 </span>
               </button>
               {f.id.startsWith('local-') && (
+                <button className="glass-btn sm" aria-label={`Share ${f.title} with classmates`} title="Share with my group or classmates" onClick={() => setSharing(f)}><IconShare /></button>
+              )}
+              {isMineShared(f) && (
+                <button className="glass-btn sm" aria-label={`Download responses to ${f.title}`} title="Download responses" onClick={() => void downloadResponses(f).then(setToast)}><IconDownload /></button>
+              )}
+              {(f.id.startsWith('local-') || isMineShared(f)) && (
                 <button className="glass-btn sm" aria-label={`Edit ${f.title}`} onClick={() => { setEditing(f); setView('build') }}><IconPencil /></button>
               )}
               {f.id.startsWith('local-') && (
@@ -182,9 +217,29 @@ export default function Collect({ isAdmin }: { isAdmin: boolean }) {
                   setLocal(localForms())
                 }}><IconTrash /></button>
               )}
-              <span className="form-card-go" aria-hidden="true"><IconChevrons width={18} /></span>
+              {isMineShared(f) && (
+                <button className="glass-btn sm" aria-label={`Stop sharing ${f.title}`} title="Stop sharing" onClick={() => void stopSharing(f)}><IconTrash /></button>
+              )}
+              <button className="form-card-go" aria-label={`Fill ${f.title}`} onClick={() => setOpen(f)}><IconChevrons width={18} /></button>
             </div>
           ))}
+          {sharing && (
+            <ShareFormSheet
+              def={sharing.definition}
+              onClose={() => setSharing(null)}
+              onShared={(newId) => {
+                // The phone copy becomes the shared form; an unfinished draft moves with it.
+                const draft = localStorage.getItem(draftKey(sharing.id))
+                if (draft) localStorage.setItem(draftKey(newId), draft)
+                localStorage.removeItem(draftKey(sharing.id))
+                removeLocalForm(sharing.id)
+                setLocal(localForms())
+                setSharing(null)
+                setReloadForms((n) => n + 1)
+                setToast(`Shared “${sharing.title}”. It's on their phones now.`)
+              }}
+            />
+          )}
         </>
       )}
 

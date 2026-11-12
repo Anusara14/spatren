@@ -12,6 +12,7 @@ export interface MeetingPoint {
   target_group: string | null
   active: boolean
   created_at: string
+  created_by: string | null
 }
 
 const CACHE = 'spatren.meeting'

@@ -11,6 +11,12 @@ export interface FormRow {
   title: string
   version: number
   definition: FormDef
+  /** batch: an admin's form for everyone; group / people: shared by a classmate */
+  scope?: 'batch' | 'group' | 'people'
+  target_group?: string | null
+  shared_with?: string[]
+  owner_name?: string | null
+  created_by?: string | null
 }
 
 interface Props {
@@ -22,6 +28,17 @@ interface Props {
 
 type GpsAnswer = { lat: number; lng: number; accuracy: number }
 const draftKey = (id: string) => `spatren.draft.${id}`
+/** media key for the whole-survey recording */
+const SURVEY_AUDIO = '__survey__'
+const pad = (n: number) => String(n).padStart(2, '0')
+const mmss = (s: number) => `${Math.floor(s / 60)}:${pad(s % 60)}`
+
+/** A recording in progress: held by the survey (not the question), so moving between questions never stops it. */
+interface Live {
+  qid: string
+  r: Recording
+  t0: number
+}
 
 export default function FormRunner({ form, onClose, preview = false }: Props) {
   const all = useMemo(() => flatQuestions(form.definition), [form])
@@ -42,6 +59,50 @@ export default function FormRunner({ form, onClose, preview = false }: Props) {
   const [step, setStep] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [live, setLive] = useState<Live | null>(null)
+  const [secs, setSecs] = useState(0)
+  const [micError, setMicError] = useState<string | null>(null)
+  const liveRef = useRef<Live | null>(null)
+  liveRef.current = live
+  const startedAt = useRef(new Date().toISOString())
+  const recordAll = !!form.definition.record_audio && !preview
+
+  // Recording clock, and a recording left running is released if the survey screen goes away.
+  useEffect(() => {
+    if (!live) return
+    const id = setInterval(() => setSecs(Math.round((Date.now() - live.t0) / 1000)), 500)
+    return () => clearInterval(id)
+  }, [live])
+  useEffect(() => () => liveRef.current?.r.cancel(), [])
+
+  async function startLive(qid: string) {
+    setMicError(null)
+    if (liveRef.current) await stopLive() // one microphone: finish the running recording first
+    try {
+      setSecs(0)
+      setLive({ qid, r: await startRecording(), t0: Date.now() })
+    } catch {
+      setMicError('Microphone blocked. Allow it for SPATREN in your phone settings, then try again.')
+    }
+  }
+
+  /** Stop the running recording and attach it; returns it with its question (also used right before submit). */
+  async function stopLive(): Promise<{ qid: string; file: LocalMedia } | null> {
+    const cur = liveRef.current
+    if (!cur) return null
+    liveRef.current = null
+    setLive(null)
+    const blob = await cur.r.stop()
+    const file: LocalMedia = { name: `${cur.qid === SURVEY_AUDIO ? 'survey' : cur.qid}-${Date.now()}.${extFor(blob.type)}`, type: blob.type, blob }
+    setMedia((m) => ({ ...m, [cur.qid]: file }))
+    return { qid: cur.qid, file }
+  }
+
+  // "Record the whole survey": starts with the first question and runs until submit.
+  useEffect(() => {
+    if (recordAll) void startLive(SURVEY_AUDIO)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recordAll])
 
   const visible = all.filter((q) => isVisible(q, answers))
   const atReview = step >= visible.length
@@ -60,7 +121,7 @@ export default function FormRunner({ form, onClose, preview = false }: Props) {
 
   function next() {
     if (!atReview) {
-      const answer = q.type === 'photo' || q.type === 'audio' ? (media[q.id] ? 'attached' : null) : answers[q.id]
+      const answer = q.type === 'photo' || q.type === 'audio' ? (hasMedia(q.id) ? 'attached' : null) : answers[q.id]
       const err = validateAnswer(q, answer)
       if (err) return setError(err)
     }
@@ -68,13 +129,29 @@ export default function FormRunner({ form, onClose, preview = false }: Props) {
     setStep((s) => Math.min(s + 1, visible.length))
   }
 
+  // A voice question counts as answered while it is recording, or when the whole survey is being recorded.
+  const hasMedia = (qid: string) => !!media[qid] || live?.qid === qid || (recordAll && (!!media[SURVEY_AUDIO] || live?.qid === SURVEY_AUDIO))
+
+  function close() {
+    if (liveRef.current && !confirm('Close the survey? The recording so far is discarded; your typed answers are kept as a draft.')) return
+    liveRef.current?.r.cancel()
+    liveRef.current = null
+    onClose(false)
+  }
+
   async function submit() {
-    if (preview) return onClose(false)
+    if (preview) {
+      liveRef.current?.r.cancel()
+      return onClose(false)
+    }
     setSaving(true)
+    // Anything still recording is stopped and saved with the response, never dropped.
+    const last = await stopLive()
+    const files: Record<string, LocalMedia> = last ? { ...media, [last.qid]: last.file } : media
     const gpsQ = visible.find((x) => x.type === 'gps' && answers[x.id])
     const loc = (gpsQ ? answers[gpsQ.id] : await currentFix(8000)) as GpsAnswer | null
     const kept: Answers = {}
-    for (const v of visible) if (v.type !== 'note') kept[v.id] = v.type === 'photo' || v.type === 'audio' ? media[v.id]?.name ?? null : answers[v.id] ?? null
+    for (const v of visible) if (v.type !== 'note') kept[v.id] = v.type === 'photo' || v.type === 'audio' ? (files[v.id] ?? (v.type === 'audio' ? files[SURVEY_AUDIO] : undefined))?.name ?? null : answers[v.id] ?? null
     const firstText = visible.find((v) => v.type === 'text' && answers[v.id])
     const text = visible.filter((v) => v.type === 'textarea' || v.type === 'text').map((v) => answers[v.id]).filter(Boolean).join('\n')
     const rec: LocalRecord = {
@@ -87,8 +164,12 @@ export default function FormRunner({ form, onClose, preview = false }: Props) {
       lng: loc?.lng ?? null,
       accuracy: loc?.accuracy ?? null,
       recorded_at: new Date().toISOString(),
-      media: Object.values(media),
-      data: { form_id: form.id, form_version: form.version, form_title: form.title, answers: kept },
+      media: Object.values(files),
+      data: {
+        form_id: form.id, form_version: form.version, form_title: form.title, answers: kept,
+        started_at: startedAt.current, submitted_at: new Date().toISOString(),
+        ...(files[SURVEY_AUDIO] ? { survey_audio: files[SURVEY_AUDIO].name } : {}),
+      },
       synced: 0,
     }
     try {
@@ -105,16 +186,24 @@ export default function FormRunner({ form, onClose, preview = false }: Props) {
   return (
     <div className="runner">
       <header className="runner-top">
-        <button className="glass-btn sm" aria-label="Close survey (answers are kept as a draft)" onClick={() => onClose(false)}><IconClose /></button>
+        <button className="glass-btn sm" aria-label="Close survey (answers are kept as a draft)" onClick={close}><IconClose /></button>
         <div className="grow">
           <div className="runner-meta"><span>{preview ? `Preview · ${form.title}` : form.title}</span><span className="tnum">{Math.min(step + 1, visible.length)} / {visible.length}</span></div>
           <div className="runner-bar"><div style={{ transform: `scaleX(${atReview ? 1 : progress})` }} /></div>
         </div>
       </header>
+      {live && (
+        <div className="runner-rec" role="status">
+          <span className="rec-dot" aria-hidden="true" />
+          <span className="grow">Recording {live.qid === SURVEY_AUDIO ? 'the survey' : `“${all.find((x) => x.id === live.qid)?.label ?? 'voice answer'}”`} · <b className="tnum">{mmss(secs)}</b></span>
+          {live.qid !== SURVEY_AUDIO && <button className="btn btn-sm btn-ghost" onClick={() => void stopLive()}>Stop</button>}
+        </div>
+      )}
+      {micError && <p className="runner-error" role="alert" style={{ margin: '8px 16px 0' }}>{micError}{recordAll ? ' The survey continues without audio.' : ''}</p>}
 
       <main className="runner-body" key={atReview ? 'review' : q.id}>
         {atReview ? (
-          <Review form={form} visible={visible} answers={answers} media={media} onEdit={(i) => setStep(i)} />
+          <Review form={form} visible={visible} answers={answers} hasMedia={hasMedia} recording={!!live} onEdit={(i) => setStep(i)} />
         ) : (
           <>
             <p className="runner-section">{sectionOf.get(q.id)}</p>
@@ -128,7 +217,13 @@ export default function FormRunner({ form, onClose, preview = false }: Props) {
               if (m) copy[q.id] = m
               else delete copy[q.id]
               return copy
-            })} />
+            })} audio={{
+              recording: live?.qid === q.id,
+              secs,
+              wholeSurvey: recordAll && (live?.qid === SURVEY_AUDIO || !!media[SURVEY_AUDIO]),
+              onStart: () => void startLive(q.id),
+              onStop: () => void stopLive(),
+            }} />
           </>
         )}
         {error && <p className="runner-error" role="alert">{error}</p>}
@@ -139,18 +234,27 @@ export default function FormRunner({ form, onClose, preview = false }: Props) {
         {atReview ? (
           <button className="btn btn-lime grow" onClick={() => void submit()} disabled={saving}>{preview ? 'End preview' : saving ? 'Saving…' : 'Submit response'}</button>
         ) : (
-          <button className="btn btn-primary grow" onClick={next}>{step === visible.length - 1 ? 'Review' : q.required ? 'Next' : isAnsweredLocal(q, answers, media) ? 'Next' : 'Skip'}</button>
+          <button className="btn btn-primary grow" onClick={next}>{step === visible.length - 1 ? 'Review' : q.required ? 'Next' : isAnsweredLocal(q, answers, hasMedia) ? 'Next' : 'Skip'}</button>
         )}
       </footer>
     </div>
   )
 }
 
-function isAnsweredLocal(q: Question, a: Answers, m: Record<string, LocalMedia>): boolean {
-  if (q.type === 'photo' || q.type === 'audio') return !!m[q.id]
+function isAnsweredLocal(q: Question, a: Answers, hasMedia: (qid: string) => boolean): boolean {
+  if (q.type === 'photo' || q.type === 'audio') return hasMedia(q.id)
   if (q.type === 'note') return true
   const v = a[q.id]
   return v != null && v !== '' && !(Array.isArray(v) && !v.length)
+}
+
+interface AudioControl {
+  recording: boolean
+  secs: number
+  /** the whole survey is being recorded, which covers voice questions too */
+  wholeSurvey: boolean
+  onStart: () => void
+  onStop: () => void
 }
 
 interface InputProps {
@@ -159,9 +263,25 @@ interface InputProps {
   onChange: (v: Answer) => void
   media?: LocalMedia
   onMedia: (m: LocalMedia | null) => void
+  audio: AudioControl
 }
 
-function QuestionInput({ q, value, onChange, media, onMedia }: InputProps) {
+const today = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+const nowTime = () => {
+  const d = new Date()
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function QuestionInput({ q, value, onChange, media, onMedia, audio }: InputProps) {
+  // Date and time questions start with the phone's date and time; the student can still change them.
+  useEffect(() => {
+    if ((q.type === 'date' || q.type === 'time') && (value == null || value === '')) onChange(q.type === 'date' ? today() : nowTime())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q.id])
+
   switch (q.type) {
     case 'note':
       return null
@@ -223,7 +343,7 @@ function QuestionInput({ q, value, onChange, media, onMedia }: InputProps) {
     case 'photo':
       return <PhotoInput qid={q.id} media={media} onMedia={onMedia} />
     case 'audio':
-      return <AudioInput qid={q.id} media={media} onMedia={onMedia} />
+      return <AudioInput media={media} onMedia={onMedia} control={audio} />
   }
 }
 
@@ -271,56 +391,42 @@ function PhotoInput({ qid, media, onMedia }: { qid: string; media?: LocalMedia; 
   )
 }
 
-function AudioInput({ qid, media, onMedia }: { qid: string; media?: LocalMedia; onMedia: (m: LocalMedia | null) => void }) {
-  const [rec, setRec] = useState<{ r: Recording; t0: number } | null>(null)
-  const [secs, setSecs] = useState(0)
-  const [err, setErr] = useState<string | null>(null)
+function AudioInput({ media, onMedia, control }: { media?: LocalMedia; onMedia: (m: LocalMedia | null) => void; control: AudioControl }) {
   const url = useBlobUrl(media?.blob)
-  useEffect(() => {
-    if (!rec) return
-    const id = setInterval(() => setSecs(Math.round((Date.now() - rec.t0) / 1000)), 500)
-    return () => clearInterval(id)
-  }, [rec])
-  useEffect(() => () => rec?.r.cancel(), [rec])
-  async function toggle() {
-    setErr(null)
-    if (rec) {
-      const blob = await rec.r.stop()
-      setRec(null)
-      onMedia({ name: `${qid}.${extFor(blob.type)}`, type: blob.type, blob })
-      return
-    }
-    try {
-      setSecs(0)
-      setRec({ r: await startRecording(), t0: Date.now() })
-    } catch {
-      setErr('Microphone blocked. Allow it in your browser settings.')
-    }
-  }
+  if (control.wholeSurvey && !media)
+    return (
+      <div className="media-box">
+        <p className="small"><span className="rec-dot" aria-hidden="true" /> This answer is in the whole-survey recording. Ask the question and carry on.</p>
+      </div>
+    )
   return (
     <div className="media-box">
-      {url && !rec && <audio controls src={url} style={{ width: '100%' }} />}
-      <button className={`btn grow ${rec ? 'btn-danger' : 'btn-primary'}`} onClick={() => void toggle()}>
-        <IconMic width={20} /> {rec ? `Stop · ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}` : media ? 'Record again' : 'Start recording'}
+      {url && !control.recording && <audio controls src={url} style={{ width: '100%' }} />}
+      <button className={`btn grow ${control.recording ? 'btn-danger' : 'btn-primary'}`} onClick={control.recording ? control.onStop : control.onStart}>
+        <IconMic width={20} /> {control.recording ? `Stop · ${mmss(control.secs)}` : media ? 'Record again' : 'Start recording'}
       </button>
-      {err && <p className="small" style={{ color: 'var(--danger)' }}>{err}</p>}
+      {control.recording && <p className="small muted">Keeps recording if you go to the next question. It stops when you tap Stop or submit.</p>}
+      {media && !control.recording && <button className="btn btn-ghost btn-sm" onClick={() => onMedia(null)}>Remove recording</button>}
     </div>
   )
 }
 
-function Review({ form, visible, answers, media, onEdit }: { form: FormRow; visible: Question[]; answers: Answers; media: Record<string, LocalMedia>; onEdit: (i: number) => void }) {
-  const answered = visible.filter((v) => v.type !== 'note' && isAnsweredLocal(v, answers, media)).length
+function Review({ form, visible, answers, hasMedia, recording, onEdit }: { form: FormRow; visible: Question[]; answers: Answers; hasMedia: (qid: string) => boolean; recording: boolean; onEdit: (i: number) => void }) {
+  const answered = visible.filter((v) => v.type !== 'note' && isAnsweredLocal(v, answers, hasMedia)).length
   const total = visible.filter((v) => v.type !== 'note').length
   return (
     <div className="stack" style={{ gap: 12 }}>
       <h2 className="runner-q">Ready to submit</h2>
-      <p className="runner-hint">{answered} of {total} answered for “{form.title}”. Tap any answer to change it. Location and time are added automatically.</p>
+      <p className="runner-hint">
+        {answered} of {total} answered for “{form.title}”. Tap any answer to change it. Location, date and time are added automatically.
+        {recording ? ' The recording is still running and is saved when you submit.' : ''}
+      </p>
       <div className="review-list">
         {visible.map((v, i) =>
           v.type === 'note' ? null : (
             <button key={v.id} className="review-item" onClick={() => onEdit(i)}>
               <span className="small muted">{v.label}</span>
-              <b>{v.type === 'photo' || v.type === 'audio' ? (media[v.id] ? `${v.type} attached` : '—') : display(answers[v.id])}</b>
+              <b>{v.type === 'photo' || v.type === 'audio' ? (hasMedia(v.id) ? `${v.type} attached` : '—') : display(answers[v.id])}</b>
             </button>
           ),
         )}

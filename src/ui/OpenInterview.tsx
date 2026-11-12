@@ -84,7 +84,7 @@ async function saveInterview(meta: LiveMeta, audio: Blob, seconds: number, recov
 export default function OpenInterview({ onBack, onToast }: { onBack: () => void; onToast: (m: string) => void }) {
   const profile = useMemo(myProfile, [])
   const theme = profile?.subgroup ?? null
-  const sets = useMemo(() => questionSets(theme, profile?.elective ?? null, PROMPT_CARDS), [theme, profile?.elective])
+  const sets = useMemo(() => questionSets(theme, profile?.elective ?? null, PROMPT_CARDS, profile?.batch_place ?? null), [theme, profile?.elective, profile?.batch_place])
 
   const [meta, setMeta] = useState<LiveMeta>(() => ({ session: '', started: 0, topic: '', participants: 1, consent: false, asked: [], notes: '' }))
   const [rec, setRec] = useState<Recording | null>(null)
@@ -161,7 +161,7 @@ export default function OpenInterview({ onBack, onToast }: { onBack: () => void;
       const cfg = await aiConfig()
       if (!cfg) throw new Error('Add a free AI key in Profile → AI follow-ups (or ask the admin for a class key).')
       const earlier = [...meta.asked.map((a) => a.en), ...(suggestion?.questions.map((q) => q.en) ?? [])]
-      setSuggestion(await suggestFollowUps(cfg, await rec.snapshot(25), meta.topic, earlier, [theme, profile?.elective].filter(Boolean).join(', ')))
+      setSuggestion(await suggestFollowUps(cfg, await rec.snapshot(25), meta.topic, earlier, [theme, profile?.elective].filter(Boolean).join(', '), profile?.batch_place ?? 'Anuradhapura'))
     } catch (e: unknown) {
       setAiMsg(e instanceof Error ? e.message : 'AI suggestion failed. Use the question cards.')
     }
@@ -253,7 +253,7 @@ export default function OpenInterview({ onBack, onToast }: { onBack: () => void;
             <IconMic width={20} /> {starting ? 'Starting…' : 'Start recording'}
           </button>
           <p className="small muted">
-            {theme ? `Questions for ${theme}${profile?.elective ? ` and ${profile.elective}` : ''} are ready, plus Anuradhapura-wide ones. ` : ''}
+            {theme ? `Questions for ${theme}${profile?.elective ? ` and ${profile.elective}` : ''} are ready${!profile?.batch_place || /anuradhapura/i.test(profile.batch_place) ? ', plus Anuradhapura-wide ones' : ''}. ` : ''}
             Works without signal. {hasAi ? 'AI follow-ups need internet.' : 'For AI follow-ups, add a free key in Profile → AI follow-ups.'}
           </p>
         </section>

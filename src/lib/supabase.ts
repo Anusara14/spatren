@@ -22,6 +22,14 @@ export type Profile = {
   status: 'pending' | 'approved' | 'rejected'
   tracking: boolean
   avatar: string | null
+  /** group leader: gets the group's SOS alerts and can call the group to a meeting point */
+  is_leader?: boolean
+  batch_id?: string | null
+  batch_name?: string | null
+  /** where this batch's field visit is, shown on the map */
+  batch_place?: string | null
+  /** platform owner: creates batches for other classes */
+  is_owner?: boolean
 }
 
 export type TeamRow = {
@@ -29,9 +37,12 @@ export type TeamRow = {
   full_name: string
   nickname: string | null
   avatar?: string | null
-  grp: string
-  subgroup: string
+  grp: string | null
+  subgroup: string | null
   elective: string | null
+  is_leader?: boolean
+  is_admin?: boolean
+  batch_id?: string
   user_id: string | null
   status: string | null
   email: string | null
@@ -86,3 +97,11 @@ export const emailForIndex = (index: string): string => `${index.trim().toLowerC
 // DiceBear "Adventurer Neutral" by Lisa Wischofsky, CC BY 4.0 (https://www.dicebear.com/styles/adventurer-neutral)
 export const avatarUrl = (seed: string | null | undefined): string | null =>
   seed ? `https://api.dicebear.com/9.x/adventurer-neutral/svg?seed=${encodeURIComponent(seed)}&radius=50` : null
+
+/** A database error in words a student can act on. */
+export function friendlyError(e: { message?: string } | null | undefined, action = 'do that'): string {
+  if (!navigator.onLine) return `You're offline, so this couldn't ${action}. It works again when you have signal.`
+  const m = e?.message ?? ''
+  if (/permission denied|JWT|not allowed|row-level security/i.test(m)) return `You don't have access to ${action}. If this is wrong, sign out and sign in again.`
+  return `Couldn't ${action}: ${m || 'unknown error'}.`
+}

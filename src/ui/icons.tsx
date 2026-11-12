@@ -89,3 +89,12 @@ export const IconFlag = (p: P) => (
 export const IconFormEdit = (p: P) => (
   <svg {...base} {...p}><rect x="4" y="3" width="13" height="18" rx="2.5" /><path d="M8 8h5M8 12h3" /><path d="m14 18 6-6 2 2-6 6h-2Z" /></svg>
 )
+export const IconSmile = (p: P) => (
+  <svg {...base} {...p}><circle cx="12" cy="12" r="9" /><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0" /><path d="M9 9.5h.01M15 9.5h.01" /></svg>
+)
+export const IconSearch = (p: P) => (
+  <svg {...base} {...p}><circle cx="11" cy="11" r="6.5" /><path d="m20 20-4.2-4.2" /></svg>
+)
+export const IconShare = (p: P) => (
+  <svg {...base} {...p}><circle cx="18" cy="5.5" r="2.5" /><circle cx="6" cy="12" r="2.5" /><circle cx="18" cy="18.5" r="2.5" /><path d="m8.2 10.8 7.6-4M8.2 13.2l7.6 4" /></svg>
+)

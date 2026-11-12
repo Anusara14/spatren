@@ -7,9 +7,10 @@ export interface Mate {
   index_no: string
   full_name: string
   nickname: string | null
-  grp: string
-  subgroup: string
+  grp: string | null
+  subgroup: string | null
   elective: string | null
+  is_leader?: boolean
   user_id: string
   avatar: string | null
   tracking: boolean | null
@@ -33,7 +34,8 @@ const todayIso = () => new Date(new Date().setHours(0, 0, 0, 0)).toISOString()
 
 /**
  * Who is on the map. Students: themselves + their own group (enforced by the group_status() function).
- * Admins: everyone, plus SOS alerts and today's record counts. Realtime for admins, polling for everyone.
+ * Admins: everyone in the batch, plus SOS alerts and today's record counts. Group leaders: their group plus its SOS
+ * alerts (the database only returns those). Realtime for admins and leaders, polling for everyone.
  */
 export function useTeam(profile: Profile): TeamFeed {
   const [mates, setMates] = useState<Mate[]>([])
@@ -43,6 +45,7 @@ export function useTeam(profile: Profile): TeamFeed {
   const matesRef = useRef(mates)
   matesRef.current = mates
   const admin = profile.is_admin
+  const watchesSos = admin || !!profile.is_leader
 
   const loadMates = useCallback(async () => {
     const { data } = await supabase.rpc('group_status')
@@ -50,15 +53,18 @@ export function useTeam(profile: Profile): TeamFeed {
   }, [])
 
   const loadAlerts = useCallback(async () => {
-    if (!admin) return
+    if (!watchesSos) return
     const { data } = await supabase.from('sos_alerts').select('*').neq('status', 'resolved').order('created_at', { ascending: false })
     if (!data) return
     const rows = data as SosRow[]
     const fresh = rows.filter((a) => a.status === 'open' && !knownAlerts.current.has(a.id))
     rows.forEach((a) => knownAlerts.current.add(a.id))
     setAlerts(rows) // banner first; the alarm must never block it
-    if (fresh.length) sosAlarm(nameOf(matesRef.current.find((m) => m.user_id === fresh[0].user_id)))
-  }, [admin])
+    // A leader's own SOS is theirs, not one to be alarmed by.
+    const { data: s } = await supabase.auth.getSession()
+    const others = fresh.filter((a) => a.user_id !== s.session?.user.id)
+    if (others.length) sosAlarm(nameOf(matesRef.current.find((m) => m.user_id === others[0].user_id)))
+  }, [watchesSos])
 
   const loadCounts = useCallback(async () => {
     if (!admin) return
@@ -77,9 +83,16 @@ export function useTeam(profile: Profile): TeamFeed {
   useEffect(() => {
     reload()
     const poll = setInterval(() => void loadMates(), admin ? 60_000 : 20_000)
-    const sosPoll = admin ? setInterval(() => void loadAlerts(), 15_000) : null // SOS never relies on realtime alone
+    const sosPoll = watchesSos ? setInterval(() => void loadAlerts(), 15_000) : null // SOS never relies on realtime alone
     const counts = admin ? setInterval(() => void loadCounts(), 60_000) : null
     let ch: ReturnType<typeof supabase.channel> | null = null
+    if (watchesSos && !admin) {
+      ch = supabase
+        .channel('group-sos')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'sos_alerts' }, () => void loadAlerts())
+        .subscribe((s) => s === 'SUBSCRIBED' && void loadAlerts())
+      void askNotificationPermission()
+    }
     if (admin) {
       ch = supabase
         .channel('team-live')
@@ -98,7 +111,7 @@ export function useTeam(profile: Profile): TeamFeed {
       if (counts) clearInterval(counts)
       if (ch) void supabase.removeChannel(ch)
     }
-  }, [admin, reload, loadMates, loadAlerts, loadCounts])
+  }, [admin, watchesSos, reload, loadMates, loadAlerts, loadCounts])
 
   const handleAlert = useCallback(
     async (a: SosRow, status: 'acknowledged' | 'resolved') => {

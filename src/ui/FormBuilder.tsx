@@ -132,6 +132,11 @@ export default function FormBuilder({ initial, isAdmin, replacing = null, localI
       <section className="card stack" style={{ gap: 10 }}>
         <input className="input b-title" placeholder="Form title" value={def.title} onChange={(e) => setDef({ ...def, title: e.target.value })} />
         <textarea className="input" rows={2} placeholder="Short description for the field team (optional)" value={def.description ?? ''} onChange={(e) => setDef({ ...def, description: e.target.value })} />
+        <label className="switch">
+          <input type="checkbox" checked={!!def.record_audio} onChange={(e) => setDef({ ...def, record_audio: e.target.checked || undefined })} />
+          <span className="switch-ui" aria-hidden="true" />
+          Record audio for the whole survey (starts at the first question, saved with the response)
+        </label>
       </section>
 
       {def.sections.map((s, si) => (

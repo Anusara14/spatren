@@ -54,6 +54,7 @@ export default function ProfileSheet({ profile, onClose, onChanged }: Props) {
     if (!confirm(warn)) return
     await stopTracking().catch(() => undefined)
     localStorage.removeItem('spatren.profile')
+    localStorage.removeItem('spatren.batch')
     await supabase.auth.signOut()
     location.reload()
   }

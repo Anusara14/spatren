@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { batchMatch } from '../lib/batch'
 import { answerText, flatQuestions, type Answers, type FormDef } from '../lib/forms'
 import { supabase, type RecordRow, type TeamRow } from '../lib/supabase'
 import { csvCell, download } from './export'
@@ -41,7 +42,7 @@ export default function FormsAdmin() {
   async function exportCsv(f: FormListRow) {
     const [{ data: recs }, { data: team }] = await Promise.all([
       supabase.from('records').select('*').eq('kind', 'survey').eq('data->>form_id', f.id).order('recorded_at'),
-      supabase.from('team_status').select('user_id,index_no,full_name,nickname,grp,subgroup,elective'),
+      supabase.from('team_status').select('user_id,index_no,full_name,nickname,grp,subgroup,elective').match(batchMatch()),
     ])
     const who = new Map(((team ?? []) as TeamRow[]).map((t) => [t.user_id, t]))
     const qs = flatQuestions(f.definition).filter((q) => q.type !== 'note')

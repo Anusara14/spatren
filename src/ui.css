@@ -40,7 +40,9 @@
 .form-card b { font-size: 17px; letter-spacing: -0.01em; }
 .form-card p { margin-top: 3px; }
 .form-card-meta { font-size: 12.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
-.form-card-go { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--lime); color: var(--navy); }
+.form-card-go { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--lime); color: var(--navy); border: 0; cursor: pointer; padding: 0; }
+button.form-card-go:active { transform: scale(0.94); }
+button.form-card-go:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
 .form-card.quick { background: var(--navy); color: #fff; }
 .form-card.quick .muted { color: #a8b8c6; }
 .quick-icon { flex: none; width: 48px; height: 48px; border-radius: 16px; display: grid; place-items: center; background: rgba(190, 212, 61, 0.18); color: var(--lime); }
@@ -282,3 +284,71 @@ input, textarea, select { -webkit-user-select: text; user-select: text; }
   display: block; width: 92px; height: 20px; background: currentColor;
   -webkit-mask: url(/brand/codemypage.svg) center / contain no-repeat; mask: url(/brand/codemypage.svg) center / contain no-repeat;
 }
+
+/* ===== Batches, leaders, map search, experiences ===== */
+.role-tag { display: inline-block; vertical-align: 1px; margin-left: 4px; padding: 1px 7px; border-radius: 999px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.02em; background: var(--lime-wash); color: #4a5610; }
+.role-tag.admin { background: var(--concrete-wash); color: var(--ink-2); }
+:root[data-theme='dark'] .role-tag { background: rgba(190, 212, 61, 0.16); color: #d7e77a; }
+:root[data-theme='dark'] .role-tag.admin { background: #2c2c2e; color: #c7c7cc; }
+.pill-btn.on { background: var(--lime); color: #13283c; }
+.pill-btn:disabled { opacity: 0.5; }
+.seg-scroll { flex-wrap: nowrap; overflow-x: auto; }
+.seg-scroll button { flex: none; }
+.chip-on { background: var(--lime) !important; color: #13283c !important; }
+
+/* Find someone: a floating search sheet over the map */
+.find-panel {
+  position: absolute; z-index: 30; left: 12px; right: 12px; top: calc(12px + var(--safe-t, 0px)); max-width: 460px;
+  border-radius: 20px; padding: 8px; display: flex; flex-direction: column; gap: 6px; box-shadow: var(--shadow-lg);
+  background: color-mix(in srgb, var(--surface) 90%, transparent); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+}
+.find-bar { display: flex; align-items: center; gap: 8px; padding: 2px 4px 2px 10px; color: var(--ink-3); }
+.find-input { flex: 1; min-width: 0; height: 42px; border: 0; background: none; color: var(--ink); font: 500 16px var(--font); outline: none; }
+.find-results { max-height: min(52vh, 420px); overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.find-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 0; border-radius: 14px; background: none; color: var(--ink); text-align: left; cursor: pointer; }
+.find-row:hover, .find-row:focus-visible { background: var(--surface-2); outline: none; }
+.find-sub { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.find-empty { padding: 10px; }
+
+/* Experience map legend + rating picker + pins */
+.exp-legend {
+  position: absolute; z-index: 5; left: 16px; right: 84px; bottom: calc(178px + var(--tab-b)); max-width: 360px;
+  padding: 10px 12px; border-radius: 18px; display: flex; flex-direction: column; gap: 8px; box-shadow: var(--shadow-lg);
+  background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+}
+.exp-range { padding: 3px; }
+.exp-range button { flex: 1; }
+.exp-counts { display: flex; justify-content: space-between; gap: 4px; font: 600 13px var(--font); font-variant-numeric: tabular-nums; }
+.exp-counts span { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 999px; background: color-mix(in srgb, var(--r) 22%, transparent); color: var(--ink); }
+.exp-counts i { font-style: normal; }
+.exp-badge { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px; font-weight: 700; background: color-mix(in srgb, var(--r) 24%, transparent); color: var(--ink); }
+.exp-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.exp-photos img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 12px; background: var(--surface-2); }
+.rating-field { border: 0; padding: 0; margin: 0; min-width: 0; }
+.rating-field legend { font-size: 13px; font-weight: 600; color: var(--ink-2); margin-bottom: 8px; }
+.rating-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; }
+.rating-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 2px; border-radius: 16px; cursor: pointer; min-width: 0; overflow-wrap: anywhere;
+  border: 1.5px solid var(--line); background: var(--surface); color: var(--ink); font: 600 11.5px var(--font); line-height: 1.15; text-align: center;
+  transition: transform 120ms, background 120ms, border-color 120ms;
+}
+.rating-btn span { font-size: 24px; line-height: 1; }
+.rating-btn:active { transform: scale(0.96); }
+.rating-btn.on { border-color: var(--r); background: color-mix(in srgb, var(--r) 22%, var(--surface)); }
+.rating-btn:focus-visible { outline: 2px solid var(--r); outline-offset: 2px; }
+
+/* Survey recording bar: visible on every question while the microphone is on */
+.runner-rec {
+  display: flex; align-items: center; gap: 10px; margin: 8px 16px 0; padding: 8px 12px; border-radius: 14px;
+  background: var(--danger-wash); color: var(--ink); font-size: 13.5px;
+}
+.runner-rec .rec-dot, .media-box .rec-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; flex: none; vertical-align: 1px; margin-right: 4px; }
+:root[data-theme='dark'] .runner-rec { background: rgba(229, 72, 77, 0.16); }
+
+/* Waiting-to-join count on the Admin tab */
+.tabbar button { position: relative; }
+.tab-badge {
+  position: absolute; top: 2px; right: calc(50% - 22px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
+  display: grid; place-items: center; background: var(--danger); color: #fff; font: 700 11px/1 var(--font); font-variant-numeric: tabular-nums;
+}
+.pending-panel { border: 1.5px solid var(--lime); }

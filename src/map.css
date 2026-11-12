@@ -252,3 +252,10 @@ a.btn { text-decoration: none; }
 /* show the map once SPATREN's colours are on it (no flash of the stock light style) */
 .maplibregl-canvas { opacity: 0; } /* no transition: the map must never depend on an animation finishing */
 .maplibregl-canvas.painted { opacity: 1; }
+
+/* Group leaders: a lime ring. Experience pins: a rating-coloured badge with the rating face, at every zoom. */
+.mk.mk-leader .mk-head, .mk.mk-leader .mk-dot { box-shadow: 0 0 0 3px #bed43d, 0 4px 10px rgba(19, 40, 60, 0.3); }
+.mk.mk-exp .mk-dot, .mk.mk-exp .mk-body, .mk.mk-exp .mk-name { display: none !important; }
+.mk.mk-exp .mk-person { display: flex; }
+.mk.mk-exp .mk-head { width: 30px; height: 30px; margin-bottom: 0; background: var(--c); font-size: 17px; }
+.mk.mk-exp { z-index: 1; }

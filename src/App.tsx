@@ -10,6 +10,7 @@ import { IconChart, IconField, IconPlus, IconShield } from './ui/icons'
 import Login from './ui/Login'
 import { Mark } from './ui/Theme'
 import UpdateBanner from './ui/UpdateBanner'
+import { PendingBadge } from './ui/PendingPanel'
 
 // Code-split: the map engine, Collect and Admin load on first use (all precached by the service worker for offline).
 const Admin = lazy(() => import('./ui/Admin'))
@@ -87,6 +88,7 @@ export default function App() {
             <button key={t.id} aria-current={tab === t.id ? 'page' : undefined} onClick={() => setTab(t.id)}>
               {t.icon}
               {t.label}
+              {t.id === 'admin' && <PendingBadge />}
             </button>
           ))}
       </nav>
@@ -95,7 +97,7 @@ export default function App() {
         {tab === 'field' && <Field profile={profile} onRecord={() => setTab('collect')} onProfileChange={() => void loadProfile()} />}
         {tab === 'collect' && <Collect isAdmin={profile.is_admin} />}
         {tab === 'summary' && <Summary isAdmin={profile.is_admin} />}
-        {tab === 'admin' && profile.is_admin && <Admin />}
+        {tab === 'admin' && profile.is_admin && <Admin profile={profile} />}
         </Suspense>
       </main>
     </div>
@@ -110,10 +112,10 @@ function RunnerPreview() {
 }
 
 function DevPreview() {
-  const fake: Profile = { index_no: '242343J', full_name: 'Ranasinghe W.K.Y.A', nickname: 'Anusara', grp: 'Group 3', subgroup: 'Cultural', elective: 'Land Use', is_admin: true, status: 'approved', tracking: false, avatar: 'Felix' }
+  const fake: Profile = { index_no: '242343J', full_name: 'Ranasinghe W.K.Y.A', nickname: 'Anusara', grp: 'Group 3', subgroup: 'Cultural', elective: 'Land Use', is_admin: true, status: 'approved', tracking: false, avatar: 'Felix', is_owner: true, batch_name: 'L2S4 2026', batch_place: 'Anuradhapura' }
   const h = location.hash
   if (h === '#collect-preview') return <div className="main"><Collect isAdmin /></div>
-  if (h === '#admin-preview') return <div className="main"><Admin /></div>
+  if (h === '#admin-preview') return <div className="main"><Admin profile={fake} /></div>
   if (h === '#summary-preview') return <div className="main"><Summary isAdmin={false} /></div>
   if (h === '#runner-preview') return <RunnerPreview />
   return <Field profile={fake} onRecord={() => undefined} onProfileChange={() => undefined} />

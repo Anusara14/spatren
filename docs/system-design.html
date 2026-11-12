@@ -1,0 +1,419 @@
+<title>SPATREN System Design</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column with a sticky section index on wide screens; diagrams and tables scroll inside their own frames. */
+:root {
+  --bg: #f4f7f9; --surface: #ffffff; --ink: #13283c; --muted: #4d6274; --line: #d3dee5;
+  --lime: #bed43d; --lime-ink: #4f5c00; --concrete: #bacbd5; --chip: #e8eef2;
+  --ok: #2f7d32; --warn: #a15c00; --no: #a32d2d;
+  --sans: "Geist", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --mono: "Geist Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0b1622; --surface: #12212f; --ink: #e6eef3; --muted: #9db0bf; --line: #24384a;
+  --lime: #bed43d; --lime-ink: #d4e66a; --concrete: #4a6172; --chip: #1b2e3f;
+  --ok: #7ccf80; --warn: #f0b45a; --no: #f08a8a; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0b1622; --surface: #12212f; --ink: #e6eef3; --muted: #9db0bf; --line: #24384a;
+  --lime: #bed43d; --lime-ink: #d4e66a; --concrete: #4a6172; --chip: #1b2e3f;
+  --ok: #7ccf80; --warn: #f0b45a; --no: #f08a8a; color-scheme: dark }
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font: 15px/1.6 var(--sans); }
+.wrap { max-width: 1180px; margin: 0 auto; padding-block: 40px 80px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 48px; }
+nav { position: sticky; top: calc(24px + env(safe-area-inset-top, 0px)); align-self: start; font-size: 13px; }
+nav a { display: block; color: var(--muted); text-decoration: none; padding: 5px 0 5px 12px; border-left: 2px solid var(--line); }
+nav a:hover, nav a:focus-visible { color: var(--ink); border-left-color: var(--lime); outline: none; }
+nav .k { font: 500 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+main { min-width: 0; display: grid; gap: 56px; }
+header h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.05; letter-spacing: -.03em; margin: 0 0 14px; text-wrap: balance; }
+header h1 span { background: linear-gradient(transparent 62%, var(--lime) 62%); color: var(--ink); }
+:root[data-theme="dark"] header h1 span { color: #13283c; background: var(--lime); padding: 0 6px; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) header h1 span { color: #13283c; background: var(--lime); padding: 0 6px; } }
+.lede { max-width: 66ch; color: var(--muted); font-size: 17px; margin: 0; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.pill { font: 500 12px var(--mono); padding: 4px 10px; border-radius: 99px; background: var(--chip); color: var(--ink); }
+section { display: grid; gap: 16px; }
+h2 { font-size: 24px; letter-spacing: -.015em; margin: 0; text-wrap: balance; }
+h2 small { display: block; font: 500 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--lime-ink); margin-bottom: 6px; }
+h3 { font-size: 16px; margin: 8px 0 0; }
+p { margin: 0; max-width: 70ch; }
+.muted { color: var(--muted); }
+.frame { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 20px; overflow-x: auto; }
+.frame pre.mermaid { margin: 0; min-width: 640px; text-align: center; background: transparent; }
+.cap { font-size: 13px; color: var(--muted); }
+.clients { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.client { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: grid; gap: 8px; align-content: start; }
+.client b { font-size: 16px; }
+.client .tech { font: 12px var(--mono); color: var(--muted); }
+.client ul { margin: 0; padding-left: 18px; font-size: 14px; }
+.client.hi { border-top: 4px solid var(--lime); }
+.tbl { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+table { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 14px; }
+th, td { text-align: left; vertical-align: top; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+th { font: 500 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); background: var(--chip); }
+tr:last-child td { border-bottom: 0; }
+td:first-child { font-weight: 600; white-space: nowrap; }
+.s { display: inline-block; font: 500 11px var(--mono); padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
+.s.on { background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); }
+.s.part { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); }
+.s.off { background: color-mix(in srgb, var(--no) 14%, transparent); color: var(--no); }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--muted); }
+code { font: 13px var(--mono); background: var(--chip); padding: 1px 6px; border-radius: 5px; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.note { border-left: 3px solid var(--lime); padding: 4px 0 4px 14px; color: var(--muted); max-width: 70ch; }
+ol.steps { margin: 0; padding-left: 20px; display: grid; gap: 6px; max-width: 72ch; }
+@media (max-width: 900px) {
+  .wrap { grid-template-columns: minmax(0, 1fr); gap: 28px; padding-block: 24px 60px; }
+  nav { display: none; }
+  .clients, .grid2 { grid-template-columns: minmax(0, 1fr); }
+}
+</style>
+
+<div class="wrap">
+<nav aria-label="Sections">
+  <div class="k">Contents</div>
+  <a href="#overview">Overview</a>
+  <a href="#context">System context</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#dfd0">DFD level 0</a>
+  <a href="#dfd1">DFD level 1</a>
+  <a href="#data">Data stores</a>
+  <a href="#features">Features by connectivity</a>
+  <a href="#sequence">Offline sync flow</a>
+  <a href="#updates">Updates and releases</a>
+  <a href="#security">Security</a>
+  <a href="#desktop">Desktop app build</a>
+</nav>
+
+<main>
+<header>
+  <h1>SPATREN <span>system design</span></h1>
+  <p class="lede">Architecture of the fieldwork platform used by 70 L2S4 urban planning students on the Anuradhapura field visit: one React codebase shipped as a web app, an Android APK, and a desktop transcription workstation, backed by Supabase.</p>
+  <div class="meta">
+    <span class="pill">Web PWA · iOS + any browser</span><span class="pill">Android APK · Capacitor 8</span><span class="pill">Desktop · Tauri 2 (Win/Mac)</span><span class="pill">Backend · Supabase</span><span class="pill">Cost · free tier</span>
+  </div>
+</header>
+
+<section id="overview">
+  <h2><small>01 · Overview</small>Three clients, one backend</h2>
+  <p>The web app and the APK run the <b>same React build</b>. The APK wraps it in Capacitor and swaps a few browser APIs for native plugins (background GPS, notifications, file sharing, deep-link login, over-the-air updates). Everything a student collects is written to the phone first and uploaded later, so the app works with no signal. The desktop app is a separate Tauri program that receives interview recordings from phones as ZIP files and transcribes Sinhala audio locally.</p>
+  <div class="clients">
+    <div class="client">
+      <b>Web app (PWA)</b>
+      <span class="tech">Vite · React 18 · TS · Dexie · MapLibre · Workbox</span>
+      <ul><li>iPhones (Home Screen app) and any browser</li><li>Hosted on Vercel at spatren.vercel.app</li><li>Service worker caches app, map tiles, fonts</li><li>Updates on next open</li></ul>
+    </div>
+    <div class="client hi">
+      <b>Android APK</b>
+      <span class="tech">Capacitor 8 · lk.spatren.field · Gradle 9.1</span>
+      <ul><li>Same web build inside a native shell</li><li>Background location as a foreground service</li><li>Native notifications, share sheet, file system</li><li>OTA web updates via self-hosted Capgo</li></ul>
+    </div>
+    <div class="client">
+      <b>SPATREN Desktop</b>
+      <span class="tech">Tauri 2 · Rust · whisper.cpp · React</span>
+      <ul><li>Imports recording ZIPs from phones</li><li>Sinhala speech-to-text, fully offline</li><li>Edit transcript against audio, export TXT/CSV</li><li>No login, nothing uploaded</li></ul>
+    </div>
+  </div>
+</section>
+
+<section id="context">
+  <h2><small>02 · System context</small>Who and what SPATREN talks to</h2>
+  <div class="frame"><pre class="mermaid">
+flowchart LR
+  S(["Student<br/>(70, in 4 groups)"])
+  A(["Admin / coordinator"])
+  R(["Interview respondent"])
+  SP["SPATREN<br/>Web app + Android APK"]
+  D["SPATREN Desktop<br/>(group laptop)"]
+  SB[("Supabase<br/>Auth · Postgres · Realtime · Storage · Edge Fn")]
+  G["Google OAuth"]
+  GM["Google Gemini API<br/>(optional AI follow-ups)"]
+  M["OpenFreeMap tiles<br/>DiceBear avatars"]
+  V["Vercel hosting<br/>app + OTA bundles"]
+  GH["GitHub Releases<br/>(APK download)"]
+
+  S -- "collects data, shares location, SOS" --> SP
+  A -- "approves members, publishes forms, monitors" --> SP
+  R -- "speaks (recorded with consent)" --> SP
+  SP <-- "records, locations, alerts, forms (HTTPS + WebSocket)" --> SB
+  SP -- "sign-in" --> G
+  SP -- "last 2 min of audio + topic" --> GM
+  SP -- "map tiles, avatars" --> M
+  SP -- "app files, version check, OTA zip" --> V
+  SP -- "new APK" --> GH
+  SP -- "recordings ZIP (share / USB / LocalSend)" --> D
+  A -- "reviews and corrects transcripts" --> D
+  </pre></div>
+  <p class="cap">The desktop app has no network connection to the backend. Recordings move to it as files, which keeps raw interview audio off the cloud.</p>
+</section>
+
+<section id="architecture">
+  <h2><small>03 · Architecture</small>Layers inside each client</h2>
+  <div class="frame"><pre class="mermaid">
+flowchart TB
+  subgraph PHONE["Phone: Web PWA and Android APK (shared React codebase)"]
+    direction TB
+    UI["UI tabs<br/>Field (map) · Collect · Summary · Admin"]
+    subgraph LIB["Domain modules (src/lib)"]
+      TR["tracking.ts<br/>GPS fixes, battery"]
+      SY["sync.ts<br/>outbox uploader"]
+      TM["team.ts / meeting.ts<br/>live team, SOS, meeting points"]
+      FM["forms.ts<br/>form engine"]
+      MD["media.ts / ai.ts<br/>recorder, Gemini prompts"]
+      TF["transfer.ts<br/>recordings ZIP"]
+      UP["updates.ts<br/>version check"]
+    end
+    subgraph PLAT["Platform adapter (native.ts)"]
+      WEB["Browser APIs<br/>Geolocation · Wake Lock · Notification · Service Worker"]
+      CAP["Capacitor plugins<br/>BackgroundGeolocation · LocalNotifications · Share · Filesystem · App · Updater"]
+    end
+    IDB[("IndexedDB (Dexie)<br/>points · sos · records · trail · audioChunks")]
+    UI --> LIB --> PLAT
+    LIB --> IDB
+  end
+
+  subgraph CLOUD["Supabase (free tier)"]
+    AUTH["Auth<br/>Google · index + password"]
+    EF["Edge function<br/>signup-index"]
+    PG[("Postgres + RLS<br/>members · roster · locations · records<br/>forms · sos_alerts · meeting_points · settings")]
+    RT["Realtime<br/>postgres_changes + broadcast"]
+    ST[("Storage<br/>media bucket: photos only")]
+  end
+
+  subgraph DESK["SPATREN Desktop (Tauri 2)"]
+    DUI["React UI<br/>library · player · transcript editor"]
+    RS["Rust commands<br/>import_zip · transcribe · read/write transcript"]
+    WH["whisper.cpp CLI<br/>+ Sinhala GGML model"]
+    LIBD[("App data folder<br/>library/ · models/")]
+    DUI --> RS --> WH
+    RS --> LIBD
+  end
+
+  SY -- "HTTPS (PostgREST, RPC)" --> PG
+  SY --> ST
+  TM <-- "WebSocket" --> RT
+  RT --- PG
+  UI --> AUTH
+  AUTH --- EF
+  TF -. "ZIP file" .-> RS
+  </pre></div>
+  <div class="grid2">
+    <p class="note">One codebase: <code>native.ts</code> checks <code>IS_NATIVE</code> and routes to a Capacitor plugin or the browser API. Screens never branch on platform.</p>
+    <p class="note">Server logic stays in Postgres: row-level security on every table, plus RPCs such as <code>group_status</code>, <code>activity_between</code>, <code>claim_index</code> and <code>set_tracking</code>. No custom server to run or pay for.</p>
+  </div>
+</section>
+
+<section id="dfd0">
+  <h2><small>04 · Data flow, level 0</small>SPATREN as a single process</h2>
+  <div class="frame"><pre class="mermaid">
+flowchart LR
+  S["Student"]
+  A["Admin"]
+  R["Respondent"]
+  P0(("0<br/>SPATREN<br/>platform"))
+  G["Gemini API"]
+  D["Desktop<br/>workstation"]
+  S -- "credentials, GPS fixes, survey answers, photos, notes, audio, SOS" --> P0
+  P0 -- "map of team, meeting points, alerts, own summary" --> S
+  A -- "approvals, forms, meeting points, settings, alert handling" --> P0
+  P0 -- "live team status, SOS alarms, class summaries, CSV/GeoJSON" --> A
+  R -- "spoken answers" --> P0
+  P0 -- "audio excerpt + topic" --> G
+  G -- "follow-up questions (Sinhala + English)" --> P0
+  P0 -- "recordings ZIP + manifest" --> D
+  D -- "transcripts TXT / CSV" --> A
+  </pre></div>
+</section>
+
+<section id="dfd1">
+  <h2><small>05 · Data flow, level 1</small>Main processes and stores</h2>
+  <div class="frame"><pre class="mermaid">
+flowchart LR
+  S["Student"]
+  A["Admin"]
+  G["Gemini"]
+  DK["Desktop"]
+
+  P1(("1.0<br/>Authenticate<br/>& approve"))
+  P2(("2.0<br/>Track<br/>location"))
+  P3(("3.0<br/>Collect data<br/>forms · notes · photos"))
+  P4(("4.0<br/>Open interview<br/>record + AI"))
+  P5(("5.0<br/>Sync<br/>outbox"))
+  P6(("6.0<br/>Coordinate team<br/>SOS · meeting points"))
+  P7(("7.0<br/>Summarise<br/>& export"))
+  P8(("8.0<br/>Transfer<br/>recordings"))
+
+  L1[("L1 Local outbox<br/>points · records · sos")]
+  L2[("L2 Audio chunks")]
+  C1[("C1 members / roster")]
+  C2[("C2 locations")]
+  C3[("C3 records + media")]
+  C4[("C4 forms / settings")]
+  C5[("C5 sos_alerts / meeting_points")]
+
+  S -- "index + password / Google" --> P1
+  P1 <--> C1
+  A -- "approve / remove" --> P1
+  S -- "GPS fixes" --> P2 --> L1
+  S -- "answers, photos" --> P3
+  C4 -- "published forms" --> P3
+  P3 --> L1
+  S -- "consent, topic, audio" --> P4
+  P4 --> L2
+  P4 -- "last 2 min audio" --> G
+  G -- "questions" --> P4
+  P4 -- "interview record" --> L1
+  L1 --> P5
+  P5 --> C2
+  P5 --> C3
+  P5 --> C5
+  S -- "SOS, meeting point" --> P6
+  P6 <--> C5
+  C2 -- "live positions" --> P6
+  P6 -- "alarms, team map" --> A
+  C3 --> P7
+  C2 --> P7
+  P7 -- "charts, word cloud, CSV/GeoJSON" --> A
+  P7 -- "own summary" --> S
+  L1 --> P8
+  L2 --> P8
+  P8 -- "ZIP + manifest" --> DK
+  </pre></div>
+  <p class="cap">Processes 2, 3, 4 and 6 write locally first. Only process 5 talks to the cloud for uploads, and it retries until the server confirms. Audio from open interviews never goes to C3: it stays on the phone until process 8 sends it to the desktop.</p>
+</section>
+
+<section id="data">
+  <h2><small>06 · Data stores</small>What lives where</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Store</th><th>Where</th><th>Holds</th><th>Lifetime</th></tr></thead>
+    <tbody>
+      <tr><td>points</td><td>Phone · IndexedDB</td><td>GPS fixes waiting to upload</td><td>Deleted after the server confirms</td></tr>
+      <tr><td>records</td><td>Phone · IndexedDB</td><td>Surveys, notes, interviews, photos/audio blobs, synced flag</td><td>Kept on the phone; audio stays as <code>device://</code></td></tr>
+      <tr><td>sos</td><td>Phone · IndexedDB</td><td>SOS alerts raised offline</td><td>Until uploaded</td></tr>
+      <tr><td>trail</td><td>Phone · IndexedDB</td><td>Own path for the offline map</td><td>Pruned to 3 days</td></tr>
+      <tr><td>audioChunks</td><td>Phone · IndexedDB</td><td>5-second pieces of a live interview</td><td>Until the interview is saved (crash recovery)</td></tr>
+      <tr><td>members, roster</td><td>Supabase Postgres</td><td>Who is in the class, group, subgroup, elective, status, avatar</td><td>Trip duration</td></tr>
+      <tr><td>locations</td><td>Supabase Postgres</td><td>Position history (lat, lng, accuracy, battery)</td><td>Trip duration</td></tr>
+      <tr><td>records</td><td>Supabase Postgres</td><td>Survey answers, notes, interview metadata, media paths</td><td>Trip duration</td></tr>
+      <tr><td>forms, settings</td><td>Supabase Postgres</td><td>Published survey forms; coordinator contact; class AI key</td><td>Trip duration</td></tr>
+      <tr><td>sos_alerts, meeting_points</td><td>Supabase Postgres</td><td>Live safety and meet-up data (Realtime enabled)</td><td>Trip duration</td></tr>
+      <tr><td>media bucket</td><td>Supabase Storage</td><td>Photos only (JPEG/PNG/WebP/HEIC, max 10 MB)</td><td>Trip duration</td></tr>
+      <tr><td>library/</td><td>Laptop · app data</td><td>Imported ZIPs, audio, transcripts JSON</td><td>Until deleted on the laptop</td></tr>
+      <tr><td>models/</td><td>Laptop · app data</td><td>Sinhala Whisper model (GGML, 488 MB)</td><td>Installed once</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="features">
+  <h2><small>07 · Features by connectivity</small>Web app vs APK, online vs offline</h2>
+  <div class="legend"><span><span class="s on">Full</span> works fully</span><span><span class="s part">Partial</span> works with limits</span><span><span class="s off">No</span> not available</span></div>
+  <div class="tbl"><table>
+    <thead><tr><th>Feature</th><th>Web app (iPhone / browser)</th><th>Android APK</th><th>With no internet</th><th>Needs internet for</th></tr></thead>
+    <tbody>
+      <tr><td>Sign in</td><td><span class="s on">Full</span> Google or index + password</td><td><span class="s on">Full</span> Google opens Chrome, returns via deep link</td><td><span class="s part">Partial</span> stays signed in; can't sign in fresh</td><td>First sign-in, sign-up</td></tr>
+      <tr><td>Location sharing</td><td><span class="s part">Partial</span> only while the app is open (screen kept awake)</td><td><span class="s on">Full</span> keeps running in the background, with a notification</td><td><span class="s on">Full</span> fixes saved, uploaded later</td><td>Others seeing you live</td></tr>
+      <tr><td>Field map</td><td><span class="s on">Full</span></td><td><span class="s on">Full</span></td><td><span class="s part">Partial</span> tiles already viewed are cached; own trail shown</td><td>New map areas, teammates' positions</td></tr>
+      <tr><td>Team live view (admin)</td><td><span class="s on">Full</span></td><td><span class="s on">Full</span></td><td><span class="s off">No</span> last known state only</td><td>Realtime updates</td></tr>
+      <tr><td>SOS</td><td><span class="s on">Full</span></td><td><span class="s on">Full</span> plus native notification</td><td><span class="s part">Partial</span> queued; sent when signal returns. Coordinator phone number still shown</td><td>Reaching the admin's screen</td></tr>
+      <tr><td>Meeting points</td><td><span class="s on">Full</span></td><td><span class="s on">Full</span> native alert</td><td><span class="s part">Partial</span> last loaded point visible</td><td>Creating / receiving new ones</td></tr>
+      <tr><td>Fill a form</td><td><span class="s on">Full</span></td><td><span class="s on">Full</span></td><td><span class="s on">Full</span> forms already loaded; answers saved</td><td>New forms, upload</td></tr>
+      <tr><td>Quick note + photos</td><td><span class="s on">Full</span></td><td><span class="s on">Full</span></td><td><span class="s on">Full</span></td><td>Upload</td></tr>
+      <tr><td>Open interview recording</td><td><span class="s on">Full</span></td><td><span class="s on">Full</span></td><td><span class="s on">Full</span> autosaved every 5 s, crash recovery</td><td>Nothing</td></tr>
+      <tr><td>Question sets (common + subgroup)</td><td><span class="s on">Full</span></td><td><span class="s on">Full</span></td><td><span class="s on">Full</span> built into the app</td><td>Nothing</td></tr>
+      <tr><td>AI follow-up questions</td><td><span class="s on">Full</span> with a Gemini key</td><td><span class="s on">Full</span> with a Gemini key</td><td><span class="s off">No</span> six built-in prompt cards instead</td><td>Gemini call</td></tr>
+      <tr><td>Send recordings to laptop</td><td><span class="s part">Partial</span> ZIP downloads; share sheet where Safari allows</td><td><span class="s on">Full</span> native share sheet (Drive, Quick Share, USB)</td><td><span class="s on">Full</span> ZIP built on the phone</td><td>Only if sent through Drive / WhatsApp</td></tr>
+      <tr><td>Summary tab</td><td><span class="s on">Full</span></td><td><span class="s on">Full</span></td><td><span class="s part">Partial</span> needs the last load</td><td>Fresh charts</td></tr>
+      <tr><td>Admin: forms, people, exports</td><td><span class="s on">Full</span></td><td><span class="s on">Full</span></td><td><span class="s off">No</span></td><td>All admin actions</td></tr>
+      <tr><td>App updates</td><td><span class="s on">Full</span> on next open (service worker)</td><td><span class="s on">Full</span> OTA banner, no reinstall; new APK only for native changes</td><td><span class="s off">No</span></td><td>Downloading the update</td></tr>
+      <tr><td>Push when app closed</td><td><span class="s off">No</span> iOS web limits</td><td><span class="s part">Partial</span> local alerts while tracking service runs</td><td><span class="s off">No</span></td><td>Realtime events</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note">For students on Android, the APK is the better choice: location keeps flowing with the screen off, and alerts are louder. iPhone students use the Home Screen web app and should keep SPATREN open during group movement.</p>
+</section>
+
+<section id="sequence">
+  <h2><small>08 · Offline sync flow</small>How a record reaches the server</h2>
+  <div class="frame"><pre class="mermaid">
+sequenceDiagram
+  participant U as Student
+  participant App as App (Web/APK)
+  participant IDB as IndexedDB
+  participant SB as Supabase
+  participant Adm as Admin screen
+  U->>App: Save survey / note / SOS
+  App->>IDB: write record (synced = false)
+  App-->>U: "Saved on this phone"
+  loop every few seconds, and when signal returns
+    App->>SB: upsert batch (client id, ignore duplicates)
+    alt network OK
+      SB-->>App: 201 confirmed
+      App->>IDB: mark synced / delete outbox row
+      SB-->>Adm: Realtime change event
+    else offline or error
+      App->>IDB: keep row, retry later
+    end
+  end
+  </pre></div>
+  <p class="cap">Upserts use client-generated ids, so retrying never creates duplicates, even if a confirmation was lost.</p>
+</section>
+
+<section id="updates">
+  <h2><small>09 · Updates and releases</small>How new versions reach phones</h2>
+  <div class="frame"><pre class="mermaid">
+flowchart LR
+  DEV["git push"] --> VB["Vercel build<br/>tsc · vite · ota.mjs"]
+  VB --> WEBF["Web files<br/>+ service worker"]
+  VB --> VJ["/app-version.json<br/>build, sha256, minNative"]
+  VB --> OZ["/ota/web-&lt;build&gt;.zip"]
+  WEBF --> IOS["Web app: updates on next open"]
+  VJ --> APK["APK checks on launch"]
+  APK -- "web change" --> OZ
+  OZ --> APP2["Download, verify checksum,<br/>apply on restart"]
+  APK -- "native change (minNative raised)" --> GHR["GitHub Releases<br/>spatren.apk"]
+  </pre></div>
+</section>
+
+<section id="security">
+  <h2><small>10 · Security</small>Controls in place</h2>
+  <div class="grid2">
+    <div class="client"><b>Access</b><ul>
+      <li>Index login always requires a password, so one student can't open another's account</li>
+      <li>New members stay pending until an admin approves</li>
+      <li>Row-level security on every table; students see only their own records in Summary</li>
+    </ul></div>
+    <div class="client"><b>Data</b><ul>
+      <li>Interview audio never leaves the phone except as a ZIP the student sends</li>
+      <li>Storage accepts photos only, max 10 MB, approved users only</li>
+      <li>No API keys in the repo; Gemini keys live in the phone or in the settings table</li>
+    </ul></div>
+    <div class="client"><b>Desktop</b><ul>
+      <li>ZIP import blocks path-escape entries (zip-slip)</li>
+      <li>File access scoped to the app's library folder</li>
+      <li>Model file checked by its header before install</li>
+    </ul></div>
+    <div class="client"><b>Release</b><ul>
+      <li>APK signed with an RSA 4096 key kept off GitHub</li>
+      <li>OTA bundles verified by SHA-256 before applying</li>
+      <li>CSV exports neutralise spreadsheet formulas</li>
+    </ul></div>
+  </div>
+</section>
+
+<section id="desktop">
+  <h2><small>11 · Desktop app build</small>What gets built next</h2>
+  <p>Visual Studio Build Tools 2026 (18.11.3) is installed with the C++ compiler, CMake and Windows SDK 10.0.26100. Rust is installed but needs its default toolchain set. Build steps:</p>
+  <ol class="steps">
+    <li>Set the Rust toolchain (<code>rustup default stable</code>).</li>
+    <li>Compile whisper.cpp v1.9.5 from source as a static <code>whisper-cli.exe</code> into <code>desktop/src-tauri/bin</code>.</li>
+    <li>Make a smaller quantized copy of the Sinhala model (about 180–200 MB) and compare its accuracy with the full 488 MB model.</li>
+    <li>Build and open SPATREN Desktop, add the model in Settings.</li>
+    <li>Test end to end: import a ZIP exported from the APK, transcribe, edit, export TXT and CSV.</li>
+    <li>Package the Windows installer; the Mac build runs on GitHub Actions.</li>
+  </ol>
+</section>
+</main>
+</div>

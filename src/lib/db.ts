@@ -25,7 +25,7 @@ export type LocalMedia = { name: string; type: string; blob: Blob; uploaded?: st
 
 export type LocalRecord = {
   id: string
-  kind: 'observation' | 'interview' | 'note' | 'survey'
+  kind: 'observation' | 'interview' | 'note' | 'survey' | 'experience'
   category: string
   title: string
   notes: string

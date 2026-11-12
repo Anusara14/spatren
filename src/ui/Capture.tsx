@@ -1,6 +1,7 @@
 import { liveQuery } from 'dexie'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { db, type LocalMedia, type LocalRecord } from '../lib/db'
+import { MAX_VOICE_S, RATINGS } from '../lib/experience'
 import { clock } from '../lib/geo'
 import { compressImage, extFor, startRecording, type Recording } from '../lib/media'
 import { syncNow } from '../lib/sync'
@@ -9,8 +10,9 @@ import { IconCamera, IconClose, IconMic } from './icons'
 
 type Kind = Exclude<LocalRecord['kind'], 'survey'>
 
-export default function Capture({ onBack }: { onBack?: () => void }) {
-  const [kind, setKind] = useState<Kind>('observation')
+export default function Capture({ onBack, initialKind = 'observation' }: { onBack?: () => void; initialKind?: Kind }) {
+  const [kind, setKind] = useState<Kind>(initialKind)
+  const [rating, setRating] = useState<number | null>(null)
   const [title, setTitle] = useState('')
   const [notes, setNotes] = useState('')
   const [photos, setPhotos] = useState<LocalMedia[]>([])
@@ -35,6 +37,11 @@ export default function Capture({ onBack }: { onBack?: () => void }) {
     const id = setInterval(() => setElapsed(Math.round((Date.now() - recording.started) / 1000)), 500)
     return () => clearInterval(id)
   }, [recording])
+  // Experience voice notes are shared with the batch, so they stay short.
+  useEffect(() => {
+    if (recording && kind === 'experience' && elapsed >= MAX_VOICE_S) void toggleRecording()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [elapsed, kind, recording])
   useEffect(() => {
     if (!toast) return
     const id = setTimeout(() => setToast(null), 2600)
@@ -74,7 +81,8 @@ export default function Capture({ onBack }: { onBack?: () => void }) {
   }
 
   const needsConsent = kind === 'interview' && !!audio
-  const canSave = !recording && (notes.trim() || photos.length || audio) && (!needsConsent || consent)
+  const isExp = kind === 'experience'
+  const canSave = !recording && (isExp ? rating != null : notes.trim() || photos.length || audio) && (!needsConsent || consent)
 
   async function save(e: FormEvent) {
     e.preventDefault()
@@ -82,7 +90,7 @@ export default function Capture({ onBack }: { onBack?: () => void }) {
     const rec: LocalRecord = {
       id: crypto.randomUUID(),
       kind,
-      category: kind === 'interview' ? 'Interview' : kind === 'note' ? 'Note' : 'Observation',
+      category: kind === 'interview' ? 'Interview' : kind === 'note' ? 'Note' : isExp ? 'Experience' : 'Observation',
       title: title.trim(),
       notes: notes.trim(),
       lat: fix?.lat ?? null,
@@ -90,7 +98,7 @@ export default function Capture({ onBack }: { onBack?: () => void }) {
       accuracy: fix?.accuracy ?? null,
       recorded_at: new Date().toISOString(),
       media: [...photos, ...(audio ? [audio] : [])],
-      data: kind === 'interview' ? { consent, participants: Number(participants) || 1, audio_seconds: audio ? elapsed : 0 } : {},
+      data: kind === 'interview' ? { consent, participants: Number(participants) || 1, audio_seconds: audio ? elapsed : 0 } : isExp ? { rating } : {},
       synced: 0,
     }
     try {
@@ -104,7 +112,8 @@ export default function Capture({ onBack }: { onBack?: () => void }) {
     setPhotos([])
     setAudio(null)
     setConsent(false)
-    setToast(navigator.onLine ? 'Saved. Uploading…' : 'Saved on this phone. Will upload when online.')
+    setRating(null)
+    setToast(isExp ? (navigator.onLine ? 'Shared on the experience map.' : 'Saved. It goes on the experience map when you are online.') : navigator.onLine ? 'Saved. Uploading…' : 'Saved on this phone. Will upload when online.')
     void syncNow()
     void locate()
   }
@@ -114,13 +123,13 @@ export default function Capture({ onBack }: { onBack?: () => void }) {
       {toast && <div className="toast">{toast}</div>}
       <header className="stack" style={{ gap: 4 }}>
         <div className="row between">
-          <h1 style={{ fontSize: 28, letterSpacing: '-0.03em' }}>Quick observation</h1>
+          <h1 style={{ fontSize: 28, letterSpacing: '-0.03em' }}>{isExp ? 'Share an experience' : 'Quick observation'}</h1>
           {onBack && <button type="button" className="glass-btn sm" aria-label="Back to Collect" onClick={onBack}><IconClose /></button>}
         </div>
       </header>
 
       <div className="segmented" role="group" aria-label="Record type">
-        {(['observation', 'interview', 'note'] as Kind[]).map((k) => (
+        {(['experience', 'observation', 'interview', 'note'] as Kind[]).map((k) => (
           <button type="button" key={k} aria-pressed={kind === k} onClick={() => setKind(k)}>
             {k[0].toUpperCase() + k.slice(1)}
           </button>
@@ -138,14 +147,31 @@ export default function Capture({ onBack }: { onBack?: () => void }) {
         </p>
       </div>
 
+      {isExp && (
+        <fieldset className="field rating-field">
+          <legend>How was this place?</legend>
+          <div className="rating-row" role="radiogroup" aria-label="Rating">
+            {RATINGS.map((r) => (
+              <button type="button" key={r.value} role="radio" aria-checked={rating === r.value} className={`rating-btn ${rating === r.value ? 'on' : ''}`}
+                style={{ ['--r' as string]: r.color }} onClick={() => setRating(r.value)}>
+                <span aria-hidden="true">{r.emoji}</span>
+                {r.label}
+              </button>
+            ))}
+          </div>
+          <p className="tiny muted">Shared with your batch on the experience map, with your name. Voice notes up to 1 minute.</p>
+          {!fix && !locating && <p className="tiny" style={{ color: 'var(--danger)' }}>No GPS yet: it will be shared without a map pin. Press Refresh outdoors first.</p>}
+        </fieldset>
+      )}
+
       <div className="field">
-        <label htmlFor="title">Title</label>
-        <input id="title" className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Anything: a place, a person, an issue" />
+        <label htmlFor="title">{isExp ? 'Place' : 'Title'}</label>
+        <input id="title" className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={isExp ? 'e.g. New bus stand, Jaffna junction' : 'Anything: a place, a person, an issue'} />
       </div>
 
       <div className="field">
-        <label htmlFor="notes">{kind === 'interview' ? 'Key points / facilitator notes' : 'Notes'}</label>
-        <textarea id="notes" className="input" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Sinhala, Tamil or English is fine" />
+        <label htmlFor="notes">{kind === 'interview' ? 'Key points / facilitator notes' : isExp ? 'What was it like? (optional)' : 'Notes'}</label>
+        <textarea id="notes" className="input" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={isExp ? 'Crowded, safe, dirty, shaded, noisy… Sinhala, Tamil or English is fine' : 'Sinhala, Tamil or English is fine'} />
       </div>
 
       {kind === 'interview' && (
@@ -162,7 +188,9 @@ export default function Capture({ onBack }: { onBack?: () => void }) {
         </button>
         <button type="button" className={`btn grow ${recording ? 'btn-danger' : 'btn-ghost'}`} onClick={() => void toggleRecording()}>
           <IconMic width={20} />
-          {recording ? `Stop · ${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}` : audio ? 'Re-record audio' : 'Record audio'}
+          {recording
+            ? `Stop · ${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}${isExp ? ` / 1:00` : ''}`
+            : audio ? 'Re-record audio' : isExp ? 'Voice note' : 'Record audio'}
         </button>
       </div>
 
@@ -184,7 +212,7 @@ export default function Capture({ onBack }: { onBack?: () => void }) {
         </label>
       )}
 
-      <button className="btn btn-primary btn-block" disabled={!canSave}>Save record</button>
+      <button className="btn btn-primary btn-block" disabled={!canSave}>{isExp ? (rating == null ? 'Pick a rating to share' : 'Share experience') : 'Save record'}</button>
 
       <section className="card">
         <div className="row between" style={{ marginBottom: 6 }}>

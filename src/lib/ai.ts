@@ -46,11 +46,10 @@ export async function aiConfig(): Promise<AiConfig | null> {
   const mine = myAiKey()
   if (mine) return { ...mine, source: 'mine' }
   try {
-    const { supabase } = await import('./supabase')
-    const { data } = await supabase.from('settings').select('ai_key').eq('id', 1).maybeSingle()
-    const k = (data as { ai_key: string | null } | null)?.ai_key
-    if (k) localStorage.setItem(CLASS_KEY, k)
-    else if (data) localStorage.removeItem(CLASS_KEY)
+    const { myBatch } = await import('./batch')
+    const b = await myBatch()
+    if (b?.ai_key) localStorage.setItem(CLASS_KEY, b.ai_key)
+    else if (b) localStorage.removeItem(CLASS_KEY)
   } catch {
     /* offline: use the cached class key */
   }
@@ -92,9 +91,9 @@ async function base64(blob: Blob): Promise<string> {
   return btoa(bin)
 }
 
-export function buildPrompt(topic: string, earlier: string[], theme = ''): string {
+export function buildPrompt(topic: string, earlier: string[], theme = '', place = 'Anuradhapura'): string {
   return [
-    'You help a university urban-planning student run an open-ended field interview in Anuradhapura, Sri Lanka.',
+    `You help a university urban-planning student run an open-ended field interview in ${place || 'Anuradhapura'}, Sri Lanka.`,
     `Interview topic: ${topic || 'not given'}.`,
     theme ? `The student's research theme: ${theme}. Lean the questions towards it.` : '',
     'The audio is the latest part of the interview. People mostly speak Sinhala; some Tamil or English.',
@@ -124,7 +123,7 @@ export function parseSuggestion(text: string): Suggestion {
   return { summary: typeof raw.summary === 'string' ? raw.summary.trim() : '', questions }
 }
 
-export async function suggestFollowUps(cfg: AiConfig, audio: Blob, topic: string, earlier: string[], theme = ''): Promise<Suggestion> {
+export async function suggestFollowUps(cfg: AiConfig, audio: Blob, topic: string, earlier: string[], theme = '', place = 'Anuradhapura'): Promise<Suggestion> {
   let clip: Blob
   try {
     clip = await toWav(audio)
@@ -133,7 +132,7 @@ export async function suggestFollowUps(cfg: AiConfig, audio: Blob, topic: string
   }
   if (clip.size > 15 * 1024 * 1024) throw new Error('Recording too long to send. Keep the clip under 2 minutes.')
   const body = {
-    contents: [{ parts: [{ text: buildPrompt(topic, earlier, theme) }, { inline_data: { mime_type: clip.type.split(';')[0] || 'audio/webm', data: await base64(clip) } }] }],
+    contents: [{ parts: [{ text: buildPrompt(topic, earlier, theme, place) }, { inline_data: { mime_type: clip.type.split(';')[0] || 'audio/webm', data: await base64(clip) } }] }],
     generationConfig: { responseMimeType: 'application/json', temperature: 0.5 },
   }
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(cfg.model)}:generateContent`, {

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { ago, clock, distanceMeters, formatDistance, freshness, groupColor, GROUP_COLORS, mapsLink, type Freshness } from '../lib/geo'
+import PendingPanel from './PendingPanel'
+import { ago, clock, distanceMeters, formatDistance, freshness, groupColor, groupsOf, mapsLink, type Freshness } from '../lib/geo'
 import type { MeetingPoint } from '../lib/meeting'
 import { avatarUrl, nameOf, supabase, type Profile } from '../lib/supabase'
 import type { Mate, TeamFeed } from '../lib/team'
@@ -31,6 +32,8 @@ export function Avatar({ m, size = 40 }: { m: { avatar?: string | null; grp?: st
 
 export default function TeamSheet({ profile, team, me, myUid, meeting, onClose, onShow, onTrail, onDropPin }: Props) {
   const admin = profile.is_admin
+  // Leaders run their own group: its SOS alerts and meeting pins.
+  const leads = admin || !!profile.is_leader
   const [filter, setFilter] = useState('All')
   const [sel, setSel] = useState<Mate | null>(null)
   const shown = team.mates.filter((m) => m.user_id !== myUid && (filter === 'All' || m.grp === filter))
@@ -40,7 +43,7 @@ export default function TeamSheet({ profile, team, me, myUid, meeting, onClose, 
   const bySub = useMemo(() => {
     const g = new Map<string, Mate[]>()
     for (const m of shown) {
-      const key = admin ? `${m.grp} · ${m.subgroup}` : m.subgroup
+      const key = (admin ? [m.grp, m.subgroup] : [m.subgroup]).filter(Boolean).join(' · ') || 'Group'
       g.set(key, [...(g.get(key) ?? []), m])
     }
     return [...g].sort(([a], [b]) => a.localeCompare(b))
@@ -72,7 +75,7 @@ export default function TeamSheet({ profile, team, me, myUid, meeting, onClose, 
               <div>
                 <h2 style={{ fontSize: 22, letterSpacing: '-0.02em' }}>{nameOf(sel)}</h2>
                 <p className="small muted tnum">{sel.index_no} · {sel.full_name}</p>
-                <p className="small muted">{sel.grp} · {sel.subgroup} · {sel.elective}</p>
+                <p className="small muted">{[sel.grp, sel.subgroup, sel.elective].filter(Boolean).join(' · ')}{sel.is_leader ? ' · Group leader' : ''}</p>
               </div>
             </div>
             <div className="stat-row">
@@ -92,19 +95,25 @@ export default function TeamSheet({ profile, team, me, myUid, meeting, onClose, 
           <>
             <div className="row between">
               <div>
-                <h2 style={{ fontSize: 22, letterSpacing: '-0.02em' }}>{admin ? 'Team' : `My group · ${profile.grp}`}</h2>
-                <p className="small muted tnum">{live} live · {shown.length} joined{admin ? '' : ` · ${profile.subgroup} is your subgroup`}</p>
+                <h2 style={{ fontSize: 22, letterSpacing: '-0.02em' }}>{admin ? 'Team' : `My group · ${profile.grp ?? ''}`}</h2>
+                <p className="small muted tnum">
+                  {live} live · {shown.length} joined{admin || !profile.subgroup ? '' : ` · ${profile.subgroup} is your subgroup`}
+                  {!admin && profile.is_leader ? ' · you are the group leader' : ''}
+                </p>
               </div>
               <button className="glass-btn sm" aria-label="Close" onClick={onClose}><IconClose /></button>
             </div>
 
-            {admin && (
+            {!admin && profile.is_leader && <PendingPanel scope="group" />}
+            {leads && (
               <>
-                <div className="segmented" role="group" aria-label="Filter by group">
-                  {['All', ...Object.keys(GROUP_COLORS)].map((g) => (
-                    <button key={g} aria-pressed={filter === g} onClick={() => setFilter(g)}>{g.replace('Group ', 'G')}</button>
-                  ))}
-                </div>
+                {admin && (
+                  <div className="segmented seg-scroll" role="group" aria-label="Filter by group">
+                    {['All', ...groupsOf(team.mates)].map((g) => (
+                      <button key={g} aria-pressed={filter === g} onClick={() => setFilter(g)}>{g.replace(/^Group\s*/i, 'G')}</button>
+                    ))}
+                  </div>
+                )}
                 {team.alerts.filter((a) => a.status === 'acknowledged').map((a) => (
                   <div key={a.id} className="list-row" style={{ background: 'var(--danger-wash)', boxShadow: 'none' }}>
                     <span className="small grow"><b>SOS handled</b> · {nameOf(team.byUser.get(a.user_id))} · {clock(a.created_at)}</span>
@@ -116,7 +125,7 @@ export default function TeamSheet({ profile, team, me, myUid, meeting, onClose, 
                     <b>Meeting points</b>
                     <button className="btn btn-lime btn-sm" onClick={onDropPin}>Drop a pin</button>
                   </div>
-                  {meeting.length === 0 && <p className="small muted">Call a group, or everyone, to one spot. Their phones buzz and show directions.</p>}
+                  {meeting.length === 0 && <p className="small muted">{admin ? 'Call a group, or everyone, to one spot.' : 'Call your group to one spot.'} Their phones buzz and show directions.</p>}
                   {meeting.map((mp) => (
                     <div key={mp.id} className="row" style={{ gap: 8 }}>
                       <span className="meet-flag sm" aria-hidden="true" />
@@ -125,7 +134,7 @@ export default function TeamSheet({ profile, team, me, myUid, meeting, onClose, 
                         <p className="small muted">{mp.target_group ?? 'Everyone'}{mp.meet_at ? ` · by ${clock(mp.meet_at)}` : ''} · {ago(mp.created_at)}</p>
                       </div>
                       <button className="btn btn-ghost btn-sm" onClick={() => { onShow(mp.lat, mp.lng); onClose() }}>Show</button>
-                      <button className="btn btn-ghost btn-sm" onClick={() => void endMeeting(mp)}>End</button>
+                      {(admin || mp.created_by === myUid) && <button className="btn btn-ghost btn-sm" onClick={() => void endMeeting(mp)}>End</button>}
                     </div>
                   ))}
                 </section>
@@ -143,7 +152,7 @@ export default function TeamSheet({ profile, team, me, myUid, meeting, onClose, 
                     <button key={m.user_id} className="person" onClick={() => setSel(m)}>
                       <Avatar m={m} />
                       <div className="grow">
-                        <div style={{ fontSize: 14.5, fontWeight: 600 }}>{nameOf(m)} <span className="muted tnum" style={{ fontWeight: 400, fontSize: 12 }}>{m.index_no}</span></div>
+                        <div style={{ fontSize: 14.5, fontWeight: 600 }}>{nameOf(m)} {m.is_leader && <span className="role-tag">Leader</span>} <span className="muted tnum" style={{ fontWeight: 400, fontSize: 12 }}>{m.index_no}</span></div>
                         <div className="small muted">
                           {STATUS[f]}{m.recorded_at ? ` · ${ago(m.recorded_at)}` : ''}
                           {me && m.lat != null ? ` · ${formatDistance(distanceMeters(me, { lat: m.lat, lng: m.lng! }))}` : ''}

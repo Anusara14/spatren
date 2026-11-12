@@ -33,6 +33,8 @@ export interface Section {
 export interface FormDef {
   title: string
   description?: string
+  /** record audio for the whole survey, from the first question to submit (interview-style surveys) */
+  record_audio?: boolean
   sections: Section[]
 }
 
@@ -110,7 +112,7 @@ export function parseForm(raw: string): { form?: FormDef; errors: string[]; warn
     sections.push({ title: typeof s.title === 'string' && s.title.trim() ? s.title.trim() : `Section ${si + 1}`, questions })
   }
   if (errors.length) return { errors, warnings }
-  return { form: { title, description: typeof o.description === 'string' ? o.description : undefined, sections }, errors: [], warnings }
+  return { form: { title, description: typeof o.description === 'string' ? o.description : undefined, record_audio: o.record_audio === true || undefined, sections }, errors: [], warnings }
 }
 
 // ---------- Tolerant import: accept the shapes ChatGPT / Gemini / Claude actually produce ----------
@@ -202,6 +204,7 @@ function normalize(input: unknown): Record<string, unknown> {
   return {
     title: labelOf(pick(o, 'title', 'name', 'form_title', 'survey_title')) || 'Imported survey',
     description: labelOf(pick(o, 'description', 'intro', 'instructions', 'subtitle')) || undefined,
+    record_audio: o.record_audio === true || o.record_audio === 'yes' || undefined,
     sections: normSections,
   }
 }

@@ -1,14 +1,13 @@
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { Map as MlMap, Marker, type GeoJSONSource, type LayerSpecification } from 'maplibre-gl'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { DISTRICT_BOUNDS } from '../lib/geo'
+import { ANURADHAPURA, type Region } from '../lib/geo'
 import type { MeetingPoint } from '../lib/meeting'
 import { useTheme, type Theme } from '../lib/theme'
 import { IconCube, IconMinus, IconPlus2 } from './icons'
 
 const STYLE = 'https://tiles.openfreemap.org/styles/liberty' // free, no key, OSM-based, includes building heights
 const BUILDINGS_3D_FROM_ZOOM = 14
-const SACRED_CITY: [number, number] = [80.3964, 8.3495]
 
 export interface MapMarker {
   id: string
@@ -43,10 +42,12 @@ interface MapViewProps {
   topControl?: ReactNode
   /** crosshair mode: reports the map centre as the user pans */
   onCenter?: ((c: { lat: number; lng: number }) => void) | null
+  /** where the map starts and how far it can pan (per batch) */
+  region?: Region
 }
 
 export default function MapView({
-  markers = [], selectedId, onSelect, trail, me, focus, pitch = 58, meetingPoints = [], onMeetingClick, onPick = null, controls = true, controlsBottom = '24px', topControl, onCenter = null,
+  markers = [], selectedId, onSelect, trail, me, focus, pitch = 58, meetingPoints = [], onMeetingClick, onPick = null, controls = true, controlsBottom = '24px', topControl, onCenter = null, region = ANURADHAPURA,
 }: MapViewProps) {
   const el = useRef<HTMLDivElement>(null)
   const map = useRef<MlMap | null>(null)
@@ -73,13 +74,13 @@ export default function MapView({
     const m = new MlMap({
       container: el.current,
       style: STYLE,
-      center: SACRED_CITY,
-      zoom: 15.2,
+      center: region.center,
+      zoom: region.zoom,
       pitch,
       bearing: pitch > 0 ? -18 : 0,
       maxPitch: 75,
-      maxBounds: DISTRICT_BOUNDS,
-      minZoom: 8,
+      maxBounds: region.bounds ?? undefined,
+      minZoom: region.bounds === ANURADHAPURA.bounds ? 8 : 5,
       attributionControl: { compact: true },
     })
     // The base style first renders in its own light colours; keep the canvas hidden until our palette is applied.
