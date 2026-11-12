@@ -6,6 +6,9 @@ export const importZip = (path: string) => invoke<string>('import_zip', { path }
 export const listPackages = () => invoke<Package[]>('list_packages')
 export const deletePackage = (id: string) => invoke<void>('delete_package', { id })
 export const saveText = (path: string, text: string) => invoke<void>('save_text', { path, text })
+export const readAppFile = (name: string) => invoke<string | null>('read_app_file', { name })
+export const writeAppFile = (name: string, text: string) => invoke<void>('write_app_file', { name, text })
+export const listZips = (dir: string) => invoke<string[]>('list_zips', { dir })
 export const modelStatus = () => invoke<{ installed: boolean; path: string; engine: boolean }>('model_status')
 export const installModel = (src: string) => invoke<void>('install_model', { src })
 

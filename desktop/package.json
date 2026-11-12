@@ -7,7 +7,7 @@
     "dev": "vite --port 5180 --strictPort",
     "build": "tsc --noEmit && vite build",
     "tauri": "tauri",
-    "check": "node scripts/check-transcript.ts"
+    "check": "node scripts/check-transcript.ts && node scripts/check-analysis.ts"
   },
   "dependencies": {
     "@tauri-apps/api": "2.12.4",

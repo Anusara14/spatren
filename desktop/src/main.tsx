@@ -6,9 +6,15 @@ import '../../src/ui.css'
 import '../../src/theme.css'
 import './desktop.css'
 import App from './App'
+import ErrorBoundary from './ErrorBoundary'
+
+// Browser preview with sample data (dev server only, ?mock); release builds drop this branch entirely.
+if (import.meta.env.DEV && location.search.includes('mock')) await import('./dev-mock')
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </StrictMode>,
 )

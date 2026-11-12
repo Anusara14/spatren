@@ -21,6 +21,8 @@ const segs = parseWhisper(JSON.stringify({ transcription: [
   { offsets: { from: 5000, to: 9000 }, text: '' },
   { offsets: { from: 31000, to: 36000 }, text: '=SUM(1)' },
 ] }))
+// whisper can split a Sinhala character between tokens; the lossy read leaves U+FFFD, which is dropped.
+assert.equal(parseWhisper(JSON.stringify({ transcription: [{ offsets: { from: 0, to: 1 }, text: 'ගම� ' }] }))[0].text, 'ගම')
 assert.equal(segs.length, 2) // noise marker and blank dropped
 assert.equal(segs[0].text, 'අපි මෙහෙ අවුරුදු 20ක් ඉන්නවා')
 
