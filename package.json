@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build && node scripts/ota.mjs",
     "preview": "vite preview",
-    "check": "node scripts/check-forms.ts && node scripts/check-transfer.ts && node scripts/check-ai.ts && node scripts/check-roster.ts && node scripts/check-xlsform.ts",
+    "check": "node scripts/check-forms.ts && node scripts/check-transfer.ts && node scripts/check-ai.ts && node scripts/check-roster.ts && node scripts/check-xlsform.ts && node scripts/check-recorder.ts",
     "android": "npm run build && cap sync android",
     "apk": "npm run android && cd android && gradlew.bat assembleDebug"
   },

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { db, type LocalMedia, type LocalRecord } from '../lib/db'
 import { flatQuestions, isVisible, LIKERT, validateAnswer, type Answer, type Answers, type FormDef, type Question } from '../lib/forms'
-import { compressImage, extFor, startRecording, type Recording } from '../lib/media'
+import { compressImage, extFor, startRecording, type Recording, type RecState } from '../lib/media'
+import { toFiles } from '../lib/useRecorder'
 import { syncNow } from '../lib/sync'
 import { currentFix } from '../lib/tracking'
 import { IconCamera, IconClose, IconMic } from './icons'
@@ -61,6 +62,7 @@ export default function FormRunner({ form, onClose, preview = false }: Props) {
   const [saving, setSaving] = useState(false)
   const [live, setLive] = useState<Live | null>(null)
   const [secs, setSecs] = useState(0)
+  const [recState, setRecState] = useState<RecState>('recording')
   const [micError, setMicError] = useState<string | null>(null)
   const liveRef = useRef<Live | null>(null)
   liveRef.current = live
@@ -70,7 +72,7 @@ export default function FormRunner({ form, onClose, preview = false }: Props) {
   // Recording clock, and a recording left running is released if the survey screen goes away.
   useEffect(() => {
     if (!live) return
-    const id = setInterval(() => setSecs(Math.round((Date.now() - live.t0) / 1000)), 500)
+    const id = setInterval(() => setSecs(live.r.elapsed()), 500)
     return () => clearInterval(id)
   }, [live])
   useEffect(() => () => liveRef.current?.r.cancel(), [])
@@ -80,22 +82,34 @@ export default function FormRunner({ form, onClose, preview = false }: Props) {
     if (liveRef.current) await stopLive() // one microphone: finish the running recording first
     try {
       setSecs(0)
-      setLive({ qid, r: await startRecording(), t0: Date.now() })
+      setRecState('recording')
+      setLive({ qid, r: await startRecording(undefined, setRecState), t0: Date.now() })
     } catch {
       setMicError('Microphone blocked. Allow it for SPATREN in your phone settings, then try again.')
     }
   }
 
-  /** Stop the running recording and attach it; returns it with its question (also used right before submit). */
-  async function stopLive(): Promise<{ qid: string; file: LocalMedia } | null> {
+  /**
+   * Stop the running recording and attach it; returns its files keyed for the media map (also used before submit).
+   * A call that took the microphone away splits it into parts: part 2+ are kept as `${qid}__part2`… alongside.
+   */
+  async function stopLive(): Promise<Record<string, LocalMedia> | null> {
     const cur = liveRef.current
     if (!cur) return null
     liveRef.current = null
     setLive(null)
-    const blob = await cur.r.stop()
-    const file: LocalMedia = { name: `${cur.qid === SURVEY_AUDIO ? 'survey' : cur.qid}-${Date.now()}.${extFor(blob.type)}`, type: blob.type, blob }
-    setMedia((m) => ({ ...m, [cur.qid]: file }))
-    return { qid: cur.qid, file }
+    const files = toFiles(await cur.r.stop(), cur.qid === SURVEY_AUDIO ? 'survey' : cur.qid)
+    if (!files.length) return null
+    const keyed = Object.fromEntries(files.map((f, i) => [i ? `${cur.qid}__part${i + 1}` : cur.qid, f]))
+    setMedia((m) => ({ ...m, ...keyed }))
+    return keyed
+  }
+
+  function togglePause() {
+    const r = liveRef.current?.r
+    if (!r) return
+    if (r.state() === 'recording') r.pause()
+    else void r.resume().catch(() => setMicError('The microphone is still busy (a call?). Tap Resume again in a moment.'))
   }
 
   // "Record the whole survey": starts with the first question and runs until submit.
@@ -147,7 +161,7 @@ export default function FormRunner({ form, onClose, preview = false }: Props) {
     setSaving(true)
     // Anything still recording is stopped and saved with the response, never dropped.
     const last = await stopLive()
-    const files: Record<string, LocalMedia> = last ? { ...media, [last.qid]: last.file } : media
+    const files: Record<string, LocalMedia> = last ? { ...media, ...last } : media
     const gpsQ = visible.find((x) => x.type === 'gps' && answers[x.id])
     const loc = (gpsQ ? answers[gpsQ.id] : await currentFix(8000)) as GpsAnswer | null
     const kept: Answers = {}
@@ -195,7 +209,11 @@ export default function FormRunner({ form, onClose, preview = false }: Props) {
       {live && (
         <div className="runner-rec" role="status">
           <span className="rec-dot" aria-hidden="true" />
-          <span className="grow">Recording {live.qid === SURVEY_AUDIO ? 'the survey' : `“${all.find((x) => x.id === live.qid)?.label ?? 'voice answer'}”`} · <b className="tnum">{mmss(secs)}</b></span>
+          <span className="grow">
+            {recState === 'interrupted' ? 'Paused by a call' : recState === 'paused' ? 'Paused' : 'Recording'}{' '}
+            {live.qid === SURVEY_AUDIO ? 'the survey' : `“${all.find((x) => x.id === live.qid)?.label ?? 'voice answer'}”`} · <b className="tnum">{mmss(secs)}</b>
+          </span>
+          <button className="btn btn-sm btn-ghost" onClick={togglePause}>{recState === 'recording' ? 'Pause' : 'Resume'}</button>
           {live.qid !== SURVEY_AUDIO && <button className="btn btn-sm btn-ghost" onClick={() => void stopLive()}>Stop</button>}
         </div>
       )}

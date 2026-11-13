@@ -160,18 +160,23 @@ export default function MapView({
       seen.add(mk.id)
       let pin = pins.current.get(mk.id)
       if (!pin) {
-        const node = document.createElement('div')
-        node.innerHTML =
+        // MapLibre owns the outer element's classes (maplibregl-marker…: absolute positioning). Our classes go on an
+        // inner element; replacing the outer className made pins drift away from their spot when panning or zooming.
+        const outer = document.createElement('div')
+        const inner = document.createElement('div')
+        inner.innerHTML =
           '<span class="mk-dot"></span><span class="mk-person"><span class="mk-name"></span><span class="mk-head"></span><span class="mk-body"></span><span class="mk-shadow"></span></span>'
-        node.addEventListener('click', (e) => {
+        outer.appendChild(inner)
+        outer.addEventListener('click', (e) => {
           e.stopPropagation()
           onSelectRef.current?.(mk.id)
         })
-        pin = new Marker({ element: node, anchor: 'bottom' }).setLngLat([mk.lng, mk.lat]).addTo(m)
+        pin = new Marker({ element: outer, anchor: 'bottom' }).setLngLat([mk.lng, mk.lat]).addTo(m)
         pins.current.set(mk.id, pin)
       }
       pin.setLngLat([mk.lng, mk.lat])
-      const node = pin.getElement()
+      pin.getElement().style.zIndex = selectedId === mk.id ? '3' : mk.className?.includes('mk-sos') ? '2' : ''
+      const node = pin.getElement().firstElementChild as HTMLElement
       const cls = `mk ${mk.className ?? ''} ${selectedId === mk.id ? 'sel' : ''}`
       if (node.className !== cls) node.className = cls
       node.style.setProperty('--c', mk.color)

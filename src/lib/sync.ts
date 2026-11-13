@@ -142,7 +142,8 @@ async function syncRecord(uid: string, rec: LocalRecord): Promise<void> {
     media: media.map((m) => ({ path: m.uploaded!, type: m.type })),
     data: rec.data,
   }
-  const { error } = await supabase.from('records').upsert(row, { onConflict: 'id', ignoreDuplicates: true })
+  // Not ignoreDuplicates: an edited record (View & edit) must update the copy on the server; students can only update their own.
+  const { error } = await supabase.from('records').upsert(row, { onConflict: 'id' })
   if (error) throw new Error(`Record upload failed: ${error.message}`)
   await db.records.update(rec.id, { synced: 1 })
 }

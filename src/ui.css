@@ -352,3 +352,17 @@ input, textarea, select { -webkit-user-select: text; user-select: text; }
   display: grid; place-items: center; background: var(--danger); color: #fff; font: 700 11px/1 var(--font); font-variant-numeric: tabular-nums;
 }
 .pending-panel { border: 1.5px solid var(--lime); }
+
+/* Recording controls: time + Pause/Resume + Stop, with the state spelled out */
+.rec-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: 1 1 100%; padding: 8px 10px; border-radius: 14px; background: var(--danger-wash); }
+:root[data-theme='dark'] .rec-controls { background: rgba(229, 72, 77, 0.14); }
+.rec-time { display: inline-flex; align-items: center; gap: 8px; flex: 1; min-width: 0; font-weight: 600; font-size: 14px; }
+.rec-time .rec-dot, .rec-dot.paused { display: inline-block; width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.rec-time.paused .rec-dot, .rec-time.interrupted .rec-dot, .rec-dot.paused { animation: none; background: var(--ink-3); box-shadow: none; }
+.rec-time.interrupted { color: var(--warn, #b26b00); }
+
+/* Saved records open on tap */
+.record-row { width: 100%; text-align: left; cursor: pointer; border: 0; font: inherit; color: inherit; }
+.record-row:hover, .record-row:focus-visible { background: var(--surface-2); outline: none; }
+.asked-list { margin: 6px 0 0; padding-left: 16px; display: grid; gap: 4px; }
+.record-sheet { max-height: 88vh; overflow-y: auto; }

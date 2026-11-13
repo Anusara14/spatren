@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { groupsOf } from '../lib/geo'
 import { readRosterFile, type RosterParse } from '../lib/roster'
 import { friendlyError, supabase } from '../lib/supabase'
@@ -53,6 +53,7 @@ export default function RosterUpload({ batchId, batchName, onDone }: { batchId: 
       </p>
       <input ref={input} type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" hidden onChange={(e) => void pick(e.target.files?.[0])} />
       <button type="button" className="btn btn-ghost" onClick={() => input.current?.click()}>Choose class list…</button>
+      <AddOne batchId={batchId} onAdded={(r) => { setResult(r); onDone?.() }} />
 
       {parsed && (
         <div className="card-flat stack" style={{ gap: 8 }}>
@@ -88,5 +89,59 @@ export default function RosterUpload({ batchId, batchName, onDone }: { batchId: 
       )}
       {err && <p className="note-err" role="alert">{err}</p>}
     </div>
+  )
+}
+
+/** No sheet? Add students one at a time (index, name, group, topic, elective, role). */
+function AddOne({ batchId, onAdded }: { batchId: string; onAdded: (r: Result) => void }) {
+  const [f, setF] = useState({ index_no: '', full_name: '', grp: '', subgroup: '', elective: '', role: 'student' })
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+  const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value })
+  const index = f.index_no.replace(/\s/g, '').toUpperCase()
+  const valid = /^[A-Z0-9]{3,20}$/.test(index) && f.full_name.trim().length > 0
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    if (!valid) return
+    setBusy(true)
+    setErr(null)
+    const row = {
+      index_no: index, full_name: f.full_name.trim(), grp: f.grp.trim() || null, subgroup: f.subgroup.trim() || null, elective: f.elective.trim() || null,
+      is_admin: f.role === 'admin', is_leader: f.role === 'leader',
+    }
+    const { data, error } = await supabase.rpc('import_roster', { p_batch: batchId, p_rows: [row] })
+    setBusy(false)
+    if (error) return setErr(friendlyError(error, 'add the student'))
+    const r = data as Result
+    if (r.clash.length) return setErr(`${index} is already in another batch.`)
+    onAdded(r)
+    setF({ ...f, index_no: '', full_name: '' }) // keep group/topic for the next classmate
+  }
+
+  return (
+    <details className="card-flat">
+      <summary className="small"><b>Add one student</b> (no sheet needed)</summary>
+      <form className="stack" style={{ gap: 8, marginTop: 10 }} onSubmit={submit}>
+        <div className="row" style={{ gap: 8 }}>
+          <input className="input tnum" aria-label="Index number" placeholder="Index no., e.g. 251001A" value={f.index_no} maxLength={20} onChange={set('index_no')} required />
+          <input className="input grow" aria-label="Full name" placeholder="Name, e.g. Perera A.B." value={f.full_name} maxLength={120} onChange={set('full_name')} required />
+        </div>
+        <div className="row" style={{ gap: 8 }}>
+          <input className="input" aria-label="Group" placeholder="Group, e.g. Group 1" value={f.grp} maxLength={60} onChange={set('grp')} />
+          <input className="input" aria-label="Topic or subgroup" placeholder="Topic (optional)" value={f.subgroup} maxLength={60} onChange={set('subgroup')} />
+        </div>
+        <div className="row" style={{ gap: 8 }}>
+          <input className="input grow" aria-label="Elective" placeholder="Elective (optional)" value={f.elective} maxLength={60} onChange={set('elective')} />
+          <select className="input" aria-label="Role" value={f.role} onChange={set('role')}>
+            <option value="student">Student</option>
+            <option value="leader">Group leader</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        {err && <p className="note-err" role="alert">{err}</p>}
+        <button className="btn btn-lime btn-sm" disabled={!valid || busy}>{busy ? 'Adding…' : 'Add student'}</button>
+      </form>
+    </details>
   )
 }

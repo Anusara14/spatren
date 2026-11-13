@@ -12,6 +12,7 @@ import Transfer from './Transfer'
 import FormImport, { localForms, removeLocalForm } from './FormImport'
 import FormRunner, { type FormRow } from './FormRunner'
 import { downloadResponses, ShareFormSheet } from './ShareForm'
+import RecordSheet from './RecordSheet'
 import { IconBack, IconCheckCircle, IconChevrons, IconDownload, IconFilePlus, IconFormEdit, IconMic, IconNote, IconPencil, IconShare, IconSmile, IconTrash, IconUpload, IconUsers } from './icons'
 import { Mark } from './Theme'
 
@@ -46,6 +47,7 @@ export default function Collect({ isAdmin }: { isAdmin: boolean }) {
   const [editing, setEditing] = useState<FormRow | null>(null)
   const [sharing, setSharing] = useState<FormRow | null>(null)
   const [audience, setAudience] = useState<FormRow | null>(null)
+  const [viewing, setViewing] = useState<LocalRecord | null>(null)
   const [myUid, setMyUid] = useState<string | null>(null)
   const [reloadForms, setReloadForms] = useState(0)
   const online = useOnline()
@@ -279,13 +281,15 @@ export default function Collect({ isAdmin }: { isAdmin: boolean }) {
         </>
       )}
 
+      {viewing && <RecordSheet record={viewing} onClose={() => setViewing(null)} onToast={setToast} />}
+
       {view === 'ready' && (
         <>
           {back('Ready to send', <button className="btn btn-lime btn-sm" onClick={() => void sendAll()} disabled={!online || sending || !ready.length}>{sending ? 'Sending…' : 'Send all'}</button>)}
           {!online && ready.length > 0 && <p className="note-warn">You are offline. Everything here is safe on this phone and sends automatically when you are back online.</p>}
           {localStorage.getItem('spatren.syncError') && ready.length > 0 && online && <p className="note-err">Last attempt: {localStorage.getItem('spatren.syncError')}</p>}
           {ready.length === 0 && <p className="empty">Nothing waiting. Everything has been sent.</p>}
-          <RecordList records={ready} formTitle={formTitle} />
+          <RecordList records={ready} formTitle={formTitle} onOpen={setViewing} />
         </>
       )}
 
@@ -293,7 +297,7 @@ export default function Collect({ isAdmin }: { isAdmin: boolean }) {
         <>
           {back('Sent')}
           {sent.length === 0 && <p className="empty">Nothing sent from this phone yet.</p>}
-          <RecordList records={sent.slice(0, 100)} formTitle={formTitle} />
+          <RecordList records={sent.slice(0, 100)} formTitle={formTitle} onOpen={setViewing} />
         </>
       )}
 
@@ -333,18 +337,20 @@ function MenuItem({ icon, title, sub, count, accent, warn, onClick }: MenuItemPr
   )
 }
 
-function RecordList({ records, formTitle }: { records: LocalRecord[]; formTitle: (r: LocalRecord) => string }) {
+function RecordList({ records, formTitle, onOpen }: { records: LocalRecord[]; formTitle: (r: LocalRecord) => string; onOpen: (r: LocalRecord) => void }) {
   return (
     <div className="people">
       {records.map((r) => (
-        <div key={r.id} className="person-row">
+        <button key={r.id} className="person-row record-row" onClick={() => onOpen(r)} aria-label={`View or edit ${r.title || formTitle(r)}`}>
           <div className="grow">
             <b>{r.title && r.title !== formTitle(r) ? r.title : formTitle(r)}</b>
             <p className="small muted tnum">
               {formTitle(r)} · {new Date(r.recorded_at).toLocaleDateString([], { day: 'numeric', month: 'short' })} {clock(r.recorded_at)} · {r.media.length} file{r.media.length === 1 ? '' : 's'}
+              {r.data.edited_at ? ' · edited' : ''}
             </p>
           </div>
-        </div>
+          <span className="small muted">View</span>
+        </button>
       ))}
     </div>
   )

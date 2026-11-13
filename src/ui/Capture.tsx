@@ -3,10 +3,13 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { db, type LocalMedia, type LocalRecord } from '../lib/db'
 import { MAX_VOICE_S, RATINGS } from '../lib/experience'
 import { clock } from '../lib/geo'
-import { compressImage, extFor, startRecording, type Recording } from '../lib/media'
+import { compressImage, extFor } from '../lib/media'
+import { useRecorder } from '../lib/useRecorder'
 import { syncNow } from '../lib/sync'
 import { currentFix, type Fix } from '../lib/tracking'
-import { IconCamera, IconClose, IconMic } from './icons'
+import { IconCamera, IconClose } from './icons'
+import RecordControls from './RecordControls'
+import RecordSheet from './RecordSheet'
 
 type Kind = Exclude<LocalRecord['kind'], 'survey'>
 
@@ -16,15 +19,18 @@ export default function Capture({ onBack, initialKind = 'observation' }: { onBac
   const [title, setTitle] = useState('')
   const [notes, setNotes] = useState('')
   const [photos, setPhotos] = useState<LocalMedia[]>([])
-  const [audio, setAudio] = useState<LocalMedia | null>(null)
-  const [recording, setRecording] = useState<{ rec: Recording; started: number } | null>(null)
-  const [elapsed, setElapsed] = useState(0)
+  // A call during a recording can split it into parts: all of them are kept.
+  const [audios, setAudios] = useState<LocalMedia[]>([])
+  const [audioSecs, setAudioSecs] = useState(0)
+  const recorder = useRecorder()
+  const recording = recorder.active
   const [consent, setConsent] = useState(false)
   const [participants, setParticipants] = useState('1')
   const [fix, setFix] = useState<Fix | null>(null)
   const [locating, setLocating] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [mine, setMine] = useState<LocalRecord[]>([])
+  const [viewing, setViewing] = useState<LocalRecord | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
 
   useEffect(() => void locate(), [])
@@ -32,16 +38,14 @@ export default function Capture({ onBack, initialKind = 'observation' }: { onBac
     const sub = liveQuery(() => db.records.orderBy('recorded_at').reverse().limit(30).toArray()).subscribe({ next: setMine })
     return () => sub.unsubscribe()
   }, [])
-  useEffect(() => {
-    if (!recording) return
-    const id = setInterval(() => setElapsed(Math.round((Date.now() - recording.started) / 1000)), 500)
-    return () => clearInterval(id)
-  }, [recording])
   // Experience voice notes are shared with the batch, so they stay short.
   useEffect(() => {
-    if (recording && kind === 'experience' && elapsed >= MAX_VOICE_S) void toggleRecording()
+    if (recording && kind === 'experience' && recorder.secs >= MAX_VOICE_S) void stopRecording()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [elapsed, kind, recording])
+  }, [recorder.secs, kind, recording])
+  useEffect(() => {
+    if (recorder.error) setToast(recorder.error)
+  }, [recorder.error])
   useEffect(() => {
     if (!toast) return
     const id = setTimeout(() => setToast(null), 2600)
@@ -64,23 +68,15 @@ export default function Capture({ onBack, initialKind = 'observation' }: { onBac
     setPhotos((p) => [...p, ...added])
   }
 
-  async function toggleRecording() {
-    if (recording) {
-      const blob = await recording.rec.stop()
-      setRecording(null)
-      setAudio({ name: `audio-${Date.now()}.${extFor(blob.type)}`, type: blob.type, blob })
-      return
-    }
-    try {
-      const rec = await startRecording()
-      setElapsed(0)
-      setRecording({ rec, started: Date.now() })
-    } catch {
-      setToast('Microphone blocked. Allow it in browser settings.')
-    }
+  async function stopRecording() {
+    const secs = recorder.secs
+    const files = await recorder.stop('audio')
+    setAudios(files)
+    setAudioSecs(secs)
   }
 
-  const needsConsent = kind === 'interview' && !!audio
+  const audio = audios.length > 0
+  const needsConsent = kind === 'interview' && audio
   const isExp = kind === 'experience'
   const canSave = !recording && (isExp ? rating != null : notes.trim() || photos.length || audio) && (!needsConsent || consent)
 
@@ -97,8 +93,8 @@ export default function Capture({ onBack, initialKind = 'observation' }: { onBac
       lng: fix?.lng ?? null,
       accuracy: fix?.accuracy ?? null,
       recorded_at: new Date().toISOString(),
-      media: [...photos, ...(audio ? [audio] : [])],
-      data: kind === 'interview' ? { consent, participants: Number(participants) || 1, audio_seconds: audio ? elapsed : 0 } : isExp ? { rating } : {},
+      media: [...photos, ...audios],
+      data: kind === 'interview' ? { consent, participants: Number(participants) || 1, audio_seconds: audio ? audioSecs : 0 } : isExp ? { rating } : {},
       synced: 0,
     }
     try {
@@ -110,7 +106,7 @@ export default function Capture({ onBack, initialKind = 'observation' }: { onBac
     setTitle('')
     setNotes('')
     setPhotos([])
-    setAudio(null)
+    setAudios([])
     setConsent(false)
     setRating(null)
     setToast(isExp ? (navigator.onLine ? 'Shared on the experience map.' : 'Saved. It goes on the experience map when you are online.') : navigator.onLine ? 'Saved. Uploading…' : 'Saved on this phone. Will upload when online.')
@@ -186,12 +182,15 @@ export default function Capture({ onBack, initialKind = 'observation' }: { onBac
         <button type="button" className="btn btn-ghost grow" onClick={() => fileInput.current?.click()}>
           <IconCamera width={20} /> Photo {photos.length ? `(${photos.length})` : ''}
         </button>
-        <button type="button" className={`btn grow ${recording ? 'btn-danger' : 'btn-ghost'}`} onClick={() => void toggleRecording()}>
-          <IconMic width={20} />
-          {recording
-            ? `Stop · ${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}${isExp ? ` / 1:00` : ''}`
-            : audio ? 'Re-record audio' : isExp ? 'Voice note' : 'Record audio'}
-        </button>
+        <RecordControls
+          state={recorder.state}
+          secs={recorder.secs}
+          limit={isExp ? '/ 1:00' : undefined}
+          startLabel={audio ? 'Record again' : isExp ? 'Voice note' : 'Record audio'}
+          onStart={() => { setAudios([]); void recorder.start() }}
+          onTogglePause={recorder.togglePause}
+          onStop={() => void stopRecording()}
+        />
       </div>
 
       {photos.length > 0 && (
@@ -203,7 +202,8 @@ export default function Capture({ onBack, initialKind = 'observation' }: { onBac
           ))}
         </div>
       )}
-      {audio && <AudioPreview blob={audio.blob} />}
+      {!recording && audios.map((a) => <AudioPreview key={a.name} blob={a.blob} />)}
+      {!recording && audio && <button type="button" className="btn btn-ghost btn-sm" onClick={() => setAudios([])}>Remove recording</button>}
 
       {needsConsent && (
         <label className="card-flat row" style={{ alignItems: 'flex-start' }}>
@@ -220,10 +220,11 @@ export default function Capture({ onBack, initialKind = 'observation' }: { onBac
           <span className="chip">{mine.length}</span>
         </div>
         {mine.length === 0 && <p className="muted small">Nothing yet. Your first observation will appear here.</p>}
+        {mine.length > 0 && <p className="tiny muted">Tap one to see, play back or correct it.</p>}
         {mine.map((r) => {
           const img = r.media.find((m) => m.type.startsWith('image'))
           return (
-            <div className="list-item" key={r.id}>
+            <button type="button" className="list-item record-row" key={r.id} onClick={() => setViewing(r)} aria-label={`View or edit ${r.title || r.category || r.kind}`}>
               {img ? <Thumb blob={img.blob} /> : <div className="thumb" />}
               <div className="grow">
                 <div className="row between">
@@ -233,10 +234,11 @@ export default function Capture({ onBack, initialKind = 'observation' }: { onBac
                 <p className="small muted">{r.kind} · {clock(r.recorded_at)} · {r.media.length} files</p>
                 {r.notes && <p className="small" style={{ marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.notes}</p>}
               </div>
-            </div>
+            </button>
           )
         })}
       </section>
+      {viewing && <RecordSheet record={viewing} onClose={() => setViewing(null)} onToast={setToast} />}
     </form>
   )
 }

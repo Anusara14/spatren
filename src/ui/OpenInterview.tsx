@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { aiConfig, PROMPT_CARDS, suggestFollowUps, type FollowUp, type Suggestion } from '../lib/ai'
 import { db, type LocalRecord } from '../lib/db'
-import { extFor, startRecording, type Recording } from '../lib/media'
+import { extFor, startRecording, type RecState, type Recording } from '../lib/media'
 import { questionSets, TOPICS } from '../lib/questions'
 import type { Profile } from '../lib/supabase'
 import { syncNow } from '../lib/sync'
@@ -51,7 +51,7 @@ const myProfile = (): Profile | null => {
 
 const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 
-async function saveInterview(meta: LiveMeta, audio: Blob, seconds: number, recovered: boolean): Promise<void> {
+async function saveInterview(meta: LiveMeta, audio: Blob | Blob[], seconds: number, recovered: boolean): Promise<void> {
   const fix = await currentFix(8_000)
   const record: LocalRecord = {
     id: crypto.randomUUID(),
@@ -63,7 +63,8 @@ async function saveInterview(meta: LiveMeta, audio: Blob, seconds: number, recov
     lng: fix?.lng ?? null,
     accuracy: fix?.accuracy ?? null,
     recorded_at: new Date(meta.started).toISOString(),
-    media: [{ name: `interview-${meta.started}.${extFor(audio.type)}`, type: audio.type || 'audio/webm', blob: audio }],
+    // A call that took the microphone away splits the interview into parts; every part is kept, in order.
+    media: (Array.isArray(audio) ? audio : [audio]).map((b, i) => ({ name: `interview-${meta.started}${i ? `-part${i + 1}` : ''}.${extFor(b.type)}`, type: b.type || 'audio/webm', blob: b })),
     data: {
       open: true, consent: meta.consent, participants: meta.participants || 1, audio_seconds: seconds, topic: meta.topic.trim(),
       asked: meta.asked.map((a) => ({ at_s: a.at, si: a.si, en: a.en, ai: a.ai })), ...(recovered ? { recovered: true } : {}),
@@ -91,6 +92,7 @@ export default function OpenInterview({ onBack, onToast }: { onBack: () => void;
   const [starting, setStarting] = useState(false)
   const [saving, setSaving] = useState(false)
   const [elapsed, setElapsed] = useState(0)
+  const [recState, setRecState] = useState<RecState>('recording')
   const [setId, setSetId] = useState(sets[0].id)
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null)
   const [aiBusy, setAiBusy] = useState(false)
@@ -115,7 +117,8 @@ export default function OpenInterview({ onBack, onToast }: { onBack: () => void;
   }, [])
   useEffect(() => {
     if (!live) return
-    const t = setInterval(() => setElapsed(Math.round((Date.now() - meta.started) / 1000)), 1000)
+    // Recorded time, not wall time: pauses and calls don't count, so question marks line up with the audio.
+    const t = setInterval(() => setElapsed(recRef.current?.elapsed() ?? 0), 1000)
     const warn = (e: BeforeUnloadEvent) => e.preventDefault() // web: refresh/close asks first
     addEventListener('beforeunload', warn)
     return () => {
@@ -136,7 +139,8 @@ export default function OpenInterview({ onBack, onToast }: { onBack: () => void;
     setStarting(true)
     const session = crypto.randomUUID()
     try {
-      const r = await startRecording((piece) => void db.audioChunks.add({ session, blob: piece, at: Date.now() }).catch(() => undefined))
+      setRecState('recording')
+      const r = await startRecording((piece) => void db.audioChunks.add({ session, blob: piece, at: Date.now() }).catch(() => undefined), setRecState)
       const m = { ...meta, session, started: Date.now(), asked: [], notes: '' }
       setMeta(m)
       writeLive(m)
@@ -171,9 +175,10 @@ export default function OpenInterview({ onBack, onToast }: { onBack: () => void;
   async function finish() {
     if (!rec || saving) return
     setSaving(true)
-    let audio: Blob
+    let audio: Blob | Blob[]
     try {
       audio = await rec.stop()
+      if (!audio.length) throw new Error('empty')
     } catch {
       const pieces = await db.audioChunks.where('session').equals(meta.session).sortBy('id')
       audio = new Blob(pieces.map((p) => p.blob), { type: pieces[0]?.blob.type || 'audio/webm' })
@@ -265,7 +270,17 @@ export default function OpenInterview({ onBack, onToast }: { onBack: () => void;
     <div className="stack" style={{ gap: 14 }}>
       <section className="card stack oi-live" style={{ gap: 6 }}>
         <div className="row between">
-          <span className="row" style={{ gap: 8 }}><span className="dot rec-dot" /><b className="tnum" style={{ fontSize: 22 }}>{mmss(elapsed)}</b></span>
+          <span className="row" style={{ gap: 8 }}>
+            <span className={`dot rec-dot ${recState !== 'recording' ? 'paused' : ''}`} />
+            <b className="tnum" style={{ fontSize: 22 }}>{mmss(elapsed)}</b>
+            {recState !== 'recording' && <span className="small" role="status">{recState === 'interrupted' ? 'Paused by a call' : 'Paused'}</span>}
+          </span>
+          <button className="btn btn-ghost btn-sm" onClick={() => {
+            const r = recRef.current
+            if (!r) return
+            if (r.state() === 'recording') r.pause()
+            else void r.resume().catch(() => onToast('The microphone is still busy (a call?). Tap Resume again in a moment.'))
+          }}>{recState === 'recording' ? 'Pause' : 'Resume'}</button>
           <button className="btn btn-danger btn-sm" disabled={saving} onClick={() => void finish()}>{saving ? 'Saving…' : 'Stop & save'}</button>
         </div>
         <p className="small muted">{meta.topic || 'Open interview'} · {meta.asked.length} asked · keep this screen open</p>
