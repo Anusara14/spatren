@@ -72,11 +72,13 @@ export default function ProfileSheet({ profile, onClose, onChanged }: Props) {
             <div>
               <h2 style={{ fontSize: 22, letterSpacing: '-0.02em' }}>{nameOf(profile)}</h2>
               <p className="small muted tnum">{profile.index_no}{profile.full_name ? ` · ${profile.full_name}` : ''}</p>
-              <p className="small muted">{profile.grp} · {profile.subgroup} · {profile.elective}{profile.is_admin ? ' · Admin' : ''}</p>
+              <p className="small muted">{[profile.grp, profile.subgroup, profile.elective, profile.is_admin ? 'Admin' : null].filter(Boolean).join(' · ')}</p>
             </div>
           </div>
           <button className="glass-btn sm" aria-label="Close" onClick={onClose}><IconClose /></button>
         </div>
+
+        <NameSection profile={profile} onChanged={onChanged} />
 
         <section className="stack" style={{ gap: 8 }}>
           <div className="row between">
@@ -162,6 +164,32 @@ function AiKeySection() {
         <button className="btn btn-ghost btn-sm" disabled={busy || !key.trim()} onClick={() => { setBusy(true); void testAiKey(key).then(setMsg).catch(() => setMsg('No internet to check the key.')).finally(() => setBusy(false)) }}>{busy ? 'Checking…' : 'Test key'}</button>
       </div>
       {msg && <p className="small muted">{msg}</p>}
+    </section>
+  )
+}
+
+/** The name classmates see on the map and lists: any name the student likes (optional; the index always identifies them). */
+function NameSection({ profile, onChanged }: { profile: Profile; onChanged: () => void }) {
+  const [name, setName] = useState(profile.nickname ?? '')
+  const [msg, setMsg] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  async function save(e: FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    const { error } = await supabase.rpc('set_my_name', { p_name: name })
+    setBusy(false)
+    setMsg(error ? `Couldn't save: ${error.message}` : name.trim() ? 'Saved. Classmates now see this name.' : 'Cleared. Classmates see your class-list name or index.')
+    if (!error) onChanged()
+  }
+  return (
+    <section className="stack" style={{ gap: 8 }}>
+      <h3 className="section-title" style={{ margin: 0 }}>Your name</h3>
+      <form className="row" onSubmit={save}>
+        <input className="input grow" placeholder="Any name you like (optional)" maxLength={40} value={name} onChange={(e) => setName(e.target.value)} aria-label="Name classmates see" />
+        <button className="btn btn-primary btn-sm" disabled={busy || name.trim() === (profile.nickname ?? '')}>{busy ? 'Saving…' : 'Save'}</button>
+      </form>
+      <p className="tiny muted">Optional. This is what classmates see on the map. Your index number is what signs you in.</p>
+      {msg && <p className="small muted" role="status">{msg}</p>}
     </section>
   )
 }

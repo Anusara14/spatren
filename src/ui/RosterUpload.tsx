@@ -48,7 +48,7 @@ export default function RosterUpload({ batchId, batchName, onDone }: { batchId: 
   return (
     <div className="stack" style={{ gap: 10 }}>
       <p className="small muted">
-        Pick the class list as an Excel (.xlsx or .xls) or CSV file with columns like <b>Index No.</b>, <b>Name</b>, and optionally <b>Group</b>, <b>Topic</b>,{' '}
+        Pick the class list as an Excel (.xlsx or .xls) or CSV file with an <b>Index No.</b> column, and optionally <b>Name</b>, <b>Group</b>, <b>Topic</b>,{' '}
         <b>Elective</b> and <b>Role</b> (leader / admin). Merged Group and Topic cells are fine. Students already in the list are updated, never removed.
       </p>
       <input ref={input} type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" hidden onChange={(e) => void pick(e.target.files?.[0])} />
@@ -99,7 +99,7 @@ function AddOne({ batchId, onAdded }: { batchId: string; onAdded: (r: Result) =>
   const [err, setErr] = useState<string | null>(null)
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value })
   const index = f.index_no.replace(/\s/g, '').toUpperCase()
-  const valid = /^[A-Z0-9]{3,20}$/.test(index) && f.full_name.trim().length > 0
+  const valid = /^[A-Z0-9]{3,20}$/.test(index)
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -107,7 +107,7 @@ function AddOne({ batchId, onAdded }: { batchId: string; onAdded: (r: Result) =>
     setBusy(true)
     setErr(null)
     const row = {
-      index_no: index, full_name: f.full_name.trim(), grp: f.grp.trim() || null, subgroup: f.subgroup.trim() || null, elective: f.elective.trim() || null,
+      index_no: index, full_name: f.full_name.trim() || null, grp: f.grp.trim() || null, subgroup: f.subgroup.trim() || null, elective: f.elective.trim() || null,
       is_admin: f.role === 'admin', is_leader: f.role === 'leader',
     }
     const { data, error } = await supabase.rpc('import_roster', { p_batch: batchId, p_rows: [row] })
@@ -125,7 +125,7 @@ function AddOne({ batchId, onAdded }: { batchId: string; onAdded: (r: Result) =>
       <form className="stack" style={{ gap: 8, marginTop: 10 }} onSubmit={submit}>
         <div className="row" style={{ gap: 8 }}>
           <input className="input tnum" aria-label="Index number" placeholder="Index no., e.g. 251001A" value={f.index_no} maxLength={20} onChange={set('index_no')} required />
-          <input className="input grow" aria-label="Full name" placeholder="Name, e.g. Perera A.B." value={f.full_name} maxLength={120} onChange={set('full_name')} required />
+          <input className="input grow" aria-label="Name (optional)" placeholder="Name (optional)" value={f.full_name} maxLength={120} onChange={set('full_name')} />
         </div>
         <div className="row" style={{ gap: 8 }}>
           <input className="input" aria-label="Group" placeholder="Group, e.g. Group 1" value={f.grp} maxLength={60} onChange={set('grp')} />

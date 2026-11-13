@@ -5,7 +5,7 @@ import { nameOf, supabase, type Profile, type SosRow } from './supabase'
 
 export interface Mate {
   index_no: string
-  full_name: string
+  full_name: string | null
   nickname: string | null
   grp: string | null
   subgroup: string | null

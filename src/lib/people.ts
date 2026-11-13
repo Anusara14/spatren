@@ -7,7 +7,7 @@ const norm = (s: string | null | undefined) => (s ?? '').toLowerCase().normalize
  * Match by first name, last name, nickname or index: every word typed must start a word of the person's names
  * (so "sera" finds Serasinghe, "r k" finds "R.K."), or the text appears in the index number.
  */
-export function matchesPerson(m: { full_name: string; nickname: string | null; index_no: string }, query: string): boolean {
+export function matchesPerson(m: { full_name: string | null; nickname: string | null; index_no: string }, query: string): boolean {
   const q = norm(query)
   if (!q) return false
   if (m.index_no.toLowerCase().includes(q.replace(/\s/g, ''))) return true

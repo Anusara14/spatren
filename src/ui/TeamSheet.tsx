@@ -74,7 +74,7 @@ export default function TeamSheet({ profile, team, me, myUid, meeting, onClose, 
               <Avatar m={sel} size={64} />
               <div>
                 <h2 style={{ fontSize: 22, letterSpacing: '-0.02em' }}>{nameOf(sel)}</h2>
-                <p className="small muted tnum">{sel.index_no} · {sel.full_name}</p>
+                <p className="small muted tnum">{sel.index_no}{sel.full_name ? ` · ${sel.full_name}` : ''}</p>
                 <p className="small muted">{[sel.grp, sel.subgroup, sel.elective].filter(Boolean).join(' · ')}{sel.is_leader ? ' · Group leader' : ''}</p>
               </div>
             </div>

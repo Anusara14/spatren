@@ -52,7 +52,7 @@ export function FindPanel({ mates, onPick, onClose }: FindProps) {
                 </span>
                 <span className="grow" style={{ minWidth: 0 }}>
                   <b>{nameOf(m)}</b> {m.is_leader && <span className="role-tag">Leader</span>}
-                  <span className="small muted find-sub">{m.full_name} · {m.index_no}{m.grp ? ` · ${m.grp}` : ''}</span>
+                  <span className="small muted find-sub">{m.full_name ? `${m.full_name} · ` : ''}{m.index_no}{m.grp ? ` · ${m.grp}` : ''}</span>
                 </span>
                 <span className="small muted tnum">{m.lat == null ? 'No location' : f === 'live' ? 'Live' : ago(m.recorded_at)}</span>
               </button>

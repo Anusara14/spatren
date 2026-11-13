@@ -68,4 +68,12 @@ assert.equal(regionFor('Anuradhapura'), ANURADHAPURA)
 assert.equal(regionFor(null), ANURADHAPURA) // the existing batch
 assert.equal(regionFor('Kandy'), SRI_LANKA)
 
+// Name is optional: a sheet with only an index column, and rows without a name, still load
+const onlyIndex = parseRoster([['Index No.', 'Group No.'], ['252350L', '8'], ['252348m', '1']])
+assert.deepEqual(onlyIndex.rows.map((r) => [r.index_no, r.full_name, r.grp]), [['252350L', null, '8'], ['252348M', null, '1']])
+assert.deepEqual(onlyIndex.problems, [])
+const someNames = parseRoster([['Index', 'Name'], ['252350L', ''], ['252351P', 'Nehansa']])
+assert.deepEqual(someNames.rows.map((r) => r.full_name), [null, 'Nehansa'])
+assert.equal(matchesPerson({ full_name: null, nickname: 'Prashan', index_no: '252350L' }, 'pras'), true)
+
 console.info('roster import, people search, groups, regions: all checks passed')

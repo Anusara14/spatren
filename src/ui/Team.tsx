@@ -68,7 +68,7 @@ export default function Team({ profile }: { profile: Profile }) {
     return rows.filter(
       (r) =>
         (grp === 'All' || (grp === 'Leaders' ? r.is_leader : r.grp === grp)) &&
-        (!needle || r.full_name.toLowerCase().includes(needle) || (r.nickname ?? '').toLowerCase().includes(needle) || r.index_no.toLowerCase().includes(needle)),
+        (!needle || (r.full_name ?? '').toLowerCase().includes(needle) || (r.nickname ?? '').toLowerCase().includes(needle) || r.index_no.toLowerCase().includes(needle)),
     )
   }, [rows, q, grp])
   const short = (g: string | null) => (g ?? '').replace(/^Group\s*/i, 'G')
@@ -105,7 +105,7 @@ export default function Team({ profile }: { profile: Profile }) {
               <span className="dot" style={{ background: groupColor(r.grp), width: 10, height: 10 }} />
               <div className="grow">
                 <b>{nameOf(r)} {r.is_leader && <span className="role-tag">Leader</span>} {r.is_admin && <span className="role-tag admin">Admin</span>}</b>
-                <p className="small muted tnum">{r.full_name} · {r.index_no}{r.grp ? ` · ${short(r.grp)}` : ''}{r.subgroup ? ` ${r.subgroup}` : ''}{r.elective ? ` · ${r.elective}` : ''}</p>
+                <p className="small muted tnum">{r.full_name ? `${r.full_name} · ` : ''}{r.index_no}{r.grp ? ` · ${short(r.grp)}` : ''}{r.subgroup ? ` ${r.subgroup}` : ''}{r.elective ? ` · ${r.elective}` : ''}</p>
               </div>
               <button
                 className={`pill-btn ${r.is_leader ? 'on' : ''}`}

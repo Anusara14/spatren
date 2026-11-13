@@ -6,7 +6,7 @@ import { strFromU8, unzipSync } from 'fflate'
 
 export interface RosterRow {
   index_no: string
-  full_name: string
+  full_name: string | null
   grp: string | null
   subgroup: string | null
   elective: string | null
@@ -104,8 +104,8 @@ export function csvRows(text: string): string[][] {
 
 /** Turn sheet rows into roster rows: find the header row, carry merged Group/Topic cells down, check every row. */
 export function parseRoster(table: string[][]): RosterParse {
-  const headerAt = table.findIndex((r) => r.some((c) => MATCHERS.index_no.test(c)) && r.some((c) => MATCHERS.full_name.test(c)))
-  if (headerAt < 0) throw new Error('No header row found. The sheet needs columns named like "Index No." and "Name" (and optionally Group, Topic, Elective, Role).')
+  const headerAt = table.findIndex((r) => r.some((c) => MATCHERS.index_no.test(c)))
+  if (headerAt < 0) throw new Error('No header row found. The sheet needs a column named like "Index No." (and optionally Name, Group, Topic, Elective, Role).')
   const header = table[headerAt]
   const find = (re: RegExp, not: number[] = []) => header.findIndex((h, i) => !not.includes(i) && re.test(h))
   const iIndex = find(MATCHERS.index_no)
@@ -133,13 +133,12 @@ export function parseRoster(table: string[][]): RosterParse {
     const name = cell(iName)
     if (!index && !name) return
     if (!/^[A-Z0-9]{3,20}$/.test(index)) return problems.push(`Row ${line}: "${cell(iIndex) || '(empty)'}" isn't an index number.`)
-    if (!name) return problems.push(`Row ${line}: ${index} has no name.`)
     if (seen.has(index)) return problems.push(`Row ${line}: ${index} appears twice.`)
     seen.add(index)
     const role = cell(iRole).toLowerCase()
     rows.push({
       index_no: index,
-      full_name: name.slice(0, 120),
+      full_name: name.slice(0, 120) || null, // optional: students choose the name others see
       grp: grp?.slice(0, 60) ?? null,
       subgroup: sub?.slice(0, 60) ?? null,
       elective: cell(iElec).slice(0, 60) || null,

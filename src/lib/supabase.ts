@@ -34,7 +34,7 @@ export type Profile = {
 
 export type TeamRow = {
   index_no: string
-  full_name: string
+  full_name: string | null
   nickname: string | null
   avatar?: string | null
   grp: string | null
@@ -88,8 +88,8 @@ export type RecordRow = {
 }
 
 /** What classmates call each other; falls back to the class-list name. */
-export const nameOf = (r: { nickname?: string | null; full_name?: string | null } | null | undefined): string =>
-  r?.nickname || r?.full_name || 'Unknown student'
+export const nameOf = (r: { nickname?: string | null; full_name?: string | null; index_no?: string | null } | null | undefined): string =>
+  r?.nickname || r?.full_name || r?.index_no || 'Student'
 
 /** Index-based login: students without Google get a private, never-emailed address derived from their index. */
 export const emailForIndex = (index: string): string => `${index.trim().toLowerCase()}@students.spatren.app`
