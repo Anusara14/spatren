@@ -45,6 +45,7 @@ export default function Collect({ isAdmin }: { isAdmin: boolean }) {
   const [sending, setSending] = useState(false)
   const [editing, setEditing] = useState<FormRow | null>(null)
   const [sharing, setSharing] = useState<FormRow | null>(null)
+  const [audience, setAudience] = useState<FormRow | null>(null)
   const [myUid, setMyUid] = useState<string | null>(null)
   const [reloadForms, setReloadForms] = useState(0)
   const online = useOnline()
@@ -86,7 +87,7 @@ export default function Collect({ isAdmin }: { isAdmin: boolean }) {
   const untransferred = records.filter((r) => !r.exported && r.media.some((m) => m.type.startsWith('audio'))).length
   const formTitle = (r: LocalRecord) => (r.kind === 'survey' ? String(r.data.form_title ?? 'Survey') : r.kind[0].toUpperCase() + r.kind.slice(1))
 
-  const isMineShared = (f: FormRow) => !!myUid && f.created_by === myUid && f.scope !== 'batch' && !f.id.startsWith('local-')
+  const isMineShared = (f: FormRow) => !!myUid && f.created_by === myUid && !f.id.startsWith('local-')
 
   async function sendAll() {
     setSending(true)
@@ -124,11 +125,11 @@ export default function Collect({ isAdmin }: { isAdmin: boolean }) {
   /** Where a form came from, in a few words. */
   const origin = (f: FormRow) => {
     if (f.id.startsWith('local-')) return 'On this phone only'
-    if (f.created_by && f.created_by === myUid && f.scope !== 'batch')
-      return f.scope === 'group' ? `You shared it with ${f.target_group ?? 'your group'}` : `You shared it with ${f.shared_with?.length ?? 0} classmate${f.shared_with?.length === 1 ? '' : 's'}`
+    if (f.created_by && f.created_by === myUid)
+      return f.scope === 'group' ? `You shared it with ${f.target_group ?? 'your group'}` : f.scope === 'people' ? `You shared it with ${f.shared_with?.length ?? 0} classmate${f.shared_with?.length === 1 ? '' : 's'}` : `You published it to everyone · v${f.version}`
     if (f.scope === 'group') return `Shared by ${f.owner_name ?? 'a classmate'} with your group`
     if (f.scope === 'people') return `Shared with you by ${f.owner_name ?? 'a classmate'}`
-    return `Team form v${f.version}`
+    return f.owner_name ? `By ${f.owner_name} for everyone · v${f.version}` : `Team form v${f.version}`
   }
 
   async function stopSharing(f: FormRow) {
@@ -204,6 +205,9 @@ export default function Collect({ isAdmin }: { isAdmin: boolean }) {
                 <button className="glass-btn sm" aria-label={`Share ${f.title} with classmates`} title="Share with my group or classmates" onClick={() => setSharing(f)}><IconShare /></button>
               )}
               {isMineShared(f) && (
+                <button className="glass-btn sm" aria-label={`Change who can fill ${f.title}`} title="Who can fill it" onClick={() => setAudience(f)}><IconShare /></button>
+              )}
+              {isMineShared(f) && (
                 <button className="glass-btn sm" aria-label={`Download responses to ${f.title}`} title="Download responses" onClick={() => void downloadResponses(f).then(setToast)}><IconDownload /></button>
               )}
               {(f.id.startsWith('local-') || isMineShared(f)) && (
@@ -223,6 +227,18 @@ export default function Collect({ isAdmin }: { isAdmin: boolean }) {
               <button className="form-card-go" aria-label={`Fill ${f.title}`} onClick={() => setOpen(f)}><IconChevrons width={18} /></button>
             </div>
           ))}
+          {audience && (
+            <ShareFormSheet
+              def={audience.definition}
+              existing={{ id: audience.id, scope: audience.scope, shared_with: audience.shared_with }}
+              onClose={() => setAudience(null)}
+              onShared={() => {
+                setAudience(null)
+                setReloadForms((n) => n + 1)
+                setToast(`Updated who can fill “${audience.title}”.`)
+              }}
+            />
+          )}
           {sharing && (
             <ShareFormSheet
               def={sharing.definition}
@@ -236,7 +252,7 @@ export default function Collect({ isAdmin }: { isAdmin: boolean }) {
                 setLocal(localForms())
                 setSharing(null)
                 setReloadForms((n) => n + 1)
-                setToast(`Shared “${sharing.title}”. It's on their phones now.`)
+                setToast(`Published “${sharing.title}”. It's on their phones now.`)
               }}
             />
           )}

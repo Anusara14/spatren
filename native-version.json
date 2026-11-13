@@ -1,7 +1,7 @@
 {
   "//": "Keep versionCode equal to android/app/build.gradle. Raise minNativeForWeb when web code needs a newer APK (new plugin or permission).",
-  "versionCode": 1,
-  "versionName": "1.0",
+  "versionCode": 2,
+  "versionName": "1.1",
   "minNativeForWeb": 1,
   "apkUrl": "https://github.com/Anusara14/spatren/releases/latest/download/spatren.apk"
 }

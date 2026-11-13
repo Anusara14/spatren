@@ -28,7 +28,6 @@ export default function Login() {
   const [index, setIndex] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
-  const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -64,7 +63,7 @@ export default function Login() {
     try {
       if (mode === 'signup') {
         const { data, error } = await supabase.functions.invoke<{ status: string; message?: string }>('signup-index', {
-          body: { index: idx, password, name },
+          body: { index: idx, password },
         })
         const status = data?.status
         if (error || !status || status === 'error') throw new Error(data?.message ?? error?.message ?? 'Sign-up failed. Try again.')
@@ -94,7 +93,7 @@ export default function Login() {
         <form className="stack" style={{ gap: 12 }} onSubmit={submit}>
           <div className="field">
             <label htmlFor="li-idx">University index</label>
-            <input id="li-idx" className="input mono" placeholder="e.g. 123456A" value={index} maxLength={7} autoCapitalize="characters" autoComplete="username" required
+            <input id="li-idx" className="input mono" placeholder="e.g. 123456A" value={index} maxLength={20} autoCapitalize="characters" autoComplete="username" required
               onChange={(e) => setIndex(e.target.value.toUpperCase().replace(/\s/g, ''))} />
           </div>
           <div className="field">
@@ -107,11 +106,6 @@ export default function Login() {
               <div className="field">
                 <label htmlFor="li-pw2">Confirm password</label>
                 <input id="li-pw2" className="input" type="password" minLength={6} autoComplete="new-password" required value={confirm} onChange={(e) => setConfirm(e.target.value)} />
-              </div>
-              <div className="field">
-                <label htmlFor="li-name">Surname or nickname <span className="muted" style={{ fontWeight: 400 }}>(optional)</span></label>
-                <input id="li-name" className="input" placeholder="e.g. Perera or Nimal" value={name} onChange={(e) => setName(e.target.value)} />
-                <p className="small muted">Adding it gets you approved instantly. Without it, the admin approves you.</p>
               </div>
             </>
           )}

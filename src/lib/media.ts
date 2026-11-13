@@ -1,5 +1,6 @@
-// Photos are shrunk on the phone before they ever hit the outbox: 12 MP camera shots → ~300 KB.
-export async function compressImage(file: File, maxSide = 1600, quality = 0.72): Promise<Blob> {
+// Photos are shrunk on the phone before they ever hit the outbox: 12 MP camera shots → ~200 KB.
+// ponytail: 1280 px / 0.65 keeps uploads ~200 KB so 150 students fit the 1 GB free storage; raise if storage is upgraded
+export async function compressImage(file: File, maxSide = 1280, quality = 0.65): Promise<Blob> {
   try {
     const bmp = await createImageBitmap(file)
     const scale = Math.min(1, maxSide / Math.max(bmp.width, bmp.height))

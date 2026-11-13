@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build && node scripts/ota.mjs",
     "preview": "vite preview",
-    "check": "node scripts/check-forms.ts && node scripts/check-transfer.ts && node scripts/check-ai.ts && node scripts/check-roster.ts",
+    "check": "node scripts/check-forms.ts && node scripts/check-transfer.ts && node scripts/check-ai.ts && node scripts/check-roster.ts && node scripts/check-xlsform.ts",
     "android": "npm run build && cap sync android",
     "apk": "npm run android && cd android && gradlew.bat assembleDebug"
   },
@@ -26,7 +26,8 @@
     "fflate": "^0.8.3",
     "maplibre-gl": "^5.24.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.6.0",

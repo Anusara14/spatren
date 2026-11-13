@@ -155,7 +155,12 @@ export async function readRosterFile(file: File): Promise<RosterParse> {
   if (file.size > 5 * 1024 * 1024) throw new Error('That file is over 5 MB; a class list is much smaller. Pick the roster sheet.')
   const bytes = new Uint8Array(await file.arrayBuffer())
   const isZip = bytes[0] === 0x50 && bytes[1] === 0x4b
-  if (/\.xls$/i.test(file.name) && !isZip) throw new Error('Old .xls files aren\'t supported. In Excel choose File → Save As → Excel Workbook (.xlsx), then pick that.')
+  // Old binary .xls (starts D0 CF 11 E0): read with SheetJS, first sheet.
+  if (bytes[0] === 0xd0 && bytes[1] === 0xcf && bytes[2] === 0x11 && bytes[3] === 0xe0) {
+    const { readSheets } = await import('./xlsform.ts')
+    const sheets = await readSheets(bytes)
+    return parseRoster(sheets[Object.keys(sheets)[0]] ?? [])
+  }
   const table = isZip ? xlsxRows(bytes) : csvRows(new TextDecoder().decode(bytes))
   return parseRoster(table)
 }

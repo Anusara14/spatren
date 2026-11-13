@@ -52,6 +52,24 @@ export default function FormImport({ isAdmin, replacing = null, onDone, onCancel
   const [msg, setMsg] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const xlsRef = useRef<HTMLInputElement>(null)
+
+  // A KoboToolbox / ODK XLSForm, as .xlsx or .xls.
+  async function openSheet(file: File) {
+    setMsg(null)
+    setBusy(true)
+    try {
+      const { readSheets, xlsformToForm } = await import('../lib/xlsform')
+      const res = xlsformToForm(await readSheets(new Uint8Array(await file.arrayBuffer())), file.name.replace(/\.(xlsx|xls)$/i, ''))
+      setParsed(res)
+      if (res.form) setRaw(JSON.stringify(res.form, null, 2))
+    } catch (e) {
+      setParsed(null)
+      setMsg(`Couldn't read that file: ${e instanceof Error ? e.message : 'unknown error'}. Pick an XLSForm saved as .xlsx or .xls.`)
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const check = (text = raw) => {
     setMsg(null)
@@ -96,8 +114,21 @@ export default function FormImport({ isAdmin, replacing = null, onDone, onCancel
 
   return (
     <div className="stack" style={{ gap: 14 }}>
+      <section className="card-flat stack" style={{ gap: 8 }}>
+        <b>From Excel (KoboToolbox XLSForm)</b>
+        <p className="small muted">
+          Pick a form made for KoboToolbox or ODK, as <b>.xlsx</b> or <b>.xls</b>, with <i>survey</i> and <i>choices</i> sheets. Choice lists, groups, required
+          questions, simple skip logic and number limits come across.
+        </p>
+        <input ref={xlsRef} type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" hidden onChange={(e) => {
+          const f = e.target.files?.[0]
+          if (f) void openSheet(f)
+          e.target.value = ''
+        }} />
+        <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => xlsRef.current?.click()}>{busy ? 'Reading…' : 'Choose Excel form…'}</button>
+      </section>
       <p className="small muted">
-        Ask ChatGPT, Gemini, Claude or any AI to write your survey as JSON. SPATREN turns it into a form with photo, voice and GPS questions.
+        Or ask ChatGPT, Gemini, Claude or any AI to write your survey as JSON. SPATREN turns it into a form with photo, voice and GPS questions.
       </p>
       <ol className="steps">
         <li><button className="link-btn" onClick={() => void copyPrompt()}>Copy the AI prompt</button>, paste it into your AI chat and describe the survey at the end.</li>

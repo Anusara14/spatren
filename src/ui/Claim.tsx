@@ -11,12 +11,11 @@ const MESSAGES: Record<string, string> = {
   invalid_format: 'Index numbers look like 123456A: six digits and a capital letter.',
   not_in_roster: "That index isn't on the L2S4 class list. Check it, or ask the admin.",
   already_claimed: 'That index is already linked to another Google account. Ask the admin to reset it.',
-  pending: 'Thanks. The admin will approve you shortly. Tap Check approval status in a minute.',
+  pending: 'Almost there. Tap Continue again.',
 }
 
 export default function Claim({ profile, onDone }: ClaimProps) {
   const [index, setIndex] = useState(profile?.index_no ?? '')
-  const [surname, setSurname] = useState('')
   const [msg, setMsg] = useState<string | null>(profile?.status === 'pending' ? MESSAGES.pending : null)
   const [busy, setBusy] = useState(false)
 
@@ -24,7 +23,7 @@ export default function Claim({ profile, onDone }: ClaimProps) {
     e.preventDefault()
     setBusy(true)
     setMsg(null)
-    const { data, error } = await supabase.rpc('claim_index', { p_index: index, p_surname: surname })
+    const { data, error } = await supabase.rpc('claim_index', { p_index: index, p_surname: '' })
     setBusy(false)
     if (error) return setMsg(error.message)
     const status = data as string
@@ -54,24 +53,19 @@ export default function Claim({ profile, onDone }: ClaimProps) {
             placeholder="e.g. 123456A"
             value={index}
             onChange={(e) => setIndex(e.target.value.toUpperCase().replace(/\s/g, ''))}
-            maxLength={7}
+            maxLength={20}
             autoCapitalize="characters"
             autoComplete="off"
             required
           />
         </div>
-        <div className="field">
-          <label htmlFor="sn">Surname or nickname <span className="muted" style={{ fontWeight: 400 }}>(optional)</span></label>
-          <input id="sn" className="input" placeholder="e.g. Perera or Nimal" value={surname} onChange={(e) => setSurname(e.target.value)} />
-          <p className="small muted">Adding it gets you approved instantly. Without it, the admin approves you.</p>
-        </div>
         {msg && <p className="small card-flat">{msg}</p>}
-        <button className="btn btn-primary btn-block" disabled={busy || index.length < 7}>
+        <button className="btn btn-primary btn-block" disabled={busy || index.length < 3}>
           {busy ? 'Checking…' : 'Continue'}
         </button>
         {profile?.status === 'pending' && (
           <button type="button" className="btn btn-ghost btn-block" onClick={() => void onDone()}>
-            Check approval status
+            Check again
           </button>
         )}
       </form>

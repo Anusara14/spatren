@@ -5,7 +5,7 @@ import { friendlyError, nameOf, supabase } from '../lib/supabase'
 import { csvCell, download } from './export'
 import { IconClose } from './icons'
 
-export type ShareScope = 'group' | 'people'
+export type ShareScope = 'batch' | 'group' | 'people'
 
 /** Index numbers typed or pasted any way (commas, spaces, new lines), cleaned and de-duplicated. */
 export function parseIndexList(text: string): { ok: string[]; bad: string[] } {
@@ -17,18 +17,21 @@ export function parseIndexList(text: string): { ok: string[]; bad: string[] } {
 
 interface ShareProps {
   def: FormDef
-  onShared: (newId: string) => void
+  /** set to change who sees a form that is already shared */
+  existing?: { id: string; scope?: ShareScope; shared_with?: string[] } | null
+  onShared: (id: string) => void
   onClose: () => void
 }
 
 /**
- * Share a form made on this phone, like a KoboToolbox project: with my group, or with chosen classmates by index
+ * Publish a form, like a KoboToolbox project: to everyone in the batch, my group, or chosen classmates by index
  * number. It then appears on their phones under Fill a form, and their answers come back to me (Responses).
+ * Reopened on a shared form, it changes who can see it.
  */
-export function ShareFormSheet({ def, onShared, onClose }: ShareProps) {
+export function ShareFormSheet({ def, existing = null, onShared, onClose }: ShareProps) {
   const me = cachedProfile()
-  const [scope, setScope] = useState<ShareScope>(me?.grp ? 'group' : 'people')
-  const [people, setPeople] = useState('')
+  const [scope, setScope] = useState<ShareScope>(existing?.scope ?? 'batch')
+  const [people, setPeople] = useState((existing?.shared_with ?? []).join(', '))
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const list = parseIndexList(people)
@@ -37,18 +40,10 @@ export function ShareFormSheet({ def, onShared, onClose }: ShareProps) {
     setErr(null)
     if (scope === 'people' && !list.ok.length) return setErr('Type at least one index number, e.g. 242353N.')
     setBusy(true)
-    const { data, error } = await supabase
-      .from('forms')
-      .insert({
-        title: def.title,
-        definition: def,
-        scope,
-        target_group: scope === 'group' ? me?.grp : null,
-        shared_with: scope === 'people' ? list.ok : [],
-        owner_name: me ? nameOf(me) : null,
-      })
-      .select('id')
-      .single()
+    const audience = { scope, target_group: scope === 'group' ? me?.grp : null, shared_with: scope === 'people' ? list.ok : [] }
+    const { data, error } = existing
+      ? await supabase.from('forms').update({ ...audience, updated_at: new Date().toISOString() }).eq('id', existing.id).select('id').single()
+      : await supabase.from('forms').insert({ title: def.title, definition: def, ...audience, owner_name: me ? nameOf(me) : null }).select('id').single()
     setBusy(false)
     if (error || !data) return setErr(friendlyError(error, 'share the form'))
     onShared((data as { id: string }).id)
@@ -58,16 +53,20 @@ export function ShareFormSheet({ def, onShared, onClose }: ShareProps) {
     <div className="sheet-backdrop" onClick={onClose}>
       <div className="sheet stack" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Share form">
         <div className="row between">
-          <h2 style={{ fontSize: 22, letterSpacing: '-0.02em' }}>Share “{def.title}”</h2>
+          <h2 style={{ fontSize: 22, letterSpacing: '-0.02em' }}>{existing ? 'Who can fill' : 'Publish'} “{def.title}”</h2>
           <button className="glass-btn sm" aria-label="Close" onClick={onClose}><IconClose /></button>
         </div>
         <p className="small muted">{flatQuestions(def).length} questions. It appears under Fill a form on their phones, and you can download their answers here.</p>
-        <div className="segmented" role="radiogroup" aria-label="Share with">
+        <div className="segmented seg-scroll" role="radiogroup" aria-label="Share with">
+          <button role="radio" aria-checked={scope === 'batch'} aria-pressed={scope === 'batch'} onClick={() => setScope('batch')}>Everyone</button>
           <button role="radio" aria-checked={scope === 'group'} aria-pressed={scope === 'group'} disabled={!me?.grp} onClick={() => setScope('group')}>
-            My group{me?.grp ? ` · ${me.grp}` : ''}
+            My group{me?.grp ? ` · ${me.grp.replace(/^Group\s*/i, 'G')}` : ''}
           </button>
-          <button role="radio" aria-checked={scope === 'people'} aria-pressed={scope === 'people'} onClick={() => setScope('people')}>Chosen classmates</button>
+          <button role="radio" aria-checked={scope === 'people'} aria-pressed={scope === 'people'} onClick={() => setScope('people')}>Chosen people</button>
         </div>
+        <p className="tiny muted">
+          {scope === 'batch' ? `Everyone in ${me?.batch_name ?? 'your batch'} gets it.` : scope === 'group' ? `Only ${me?.grp ?? 'your group'} gets it.` : 'Only the index numbers you list get it.'}
+        </p>
         {scope === 'people' && (
           <div className="field">
             <label htmlFor="share-idx">Their index numbers</label>
@@ -80,7 +79,7 @@ export function ShareFormSheet({ def, onShared, onClose }: ShareProps) {
         )}
         {err && <p className="note-err" role="alert">{err}</p>}
         <button className="btn btn-lime btn-block" disabled={busy || !navigator.onLine} onClick={() => void share()}>
-          {busy ? 'Sharing…' : !navigator.onLine ? 'Connect to the internet to share' : 'Share form'}
+          {busy ? 'Saving…' : !navigator.onLine ? 'Connect to the internet to share' : existing ? 'Save who can fill' : 'Publish form'}
         </button>
       </div>
     </div>

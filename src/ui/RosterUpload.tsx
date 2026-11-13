@@ -48,10 +48,10 @@ export default function RosterUpload({ batchId, batchName, onDone }: { batchId: 
   return (
     <div className="stack" style={{ gap: 10 }}>
       <p className="small muted">
-        Pick the class list as an Excel (.xlsx) or CSV file with columns like <b>Index No.</b>, <b>Name</b>, and optionally <b>Group</b>, <b>Topic</b>,{' '}
+        Pick the class list as an Excel (.xlsx or .xls) or CSV file with columns like <b>Index No.</b>, <b>Name</b>, and optionally <b>Group</b>, <b>Topic</b>,{' '}
         <b>Elective</b> and <b>Role</b> (leader / admin). Merged Group and Topic cells are fine. Students already in the list are updated, never removed.
       </p>
-      <input ref={input} type="file" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" hidden onChange={(e) => void pick(e.target.files?.[0])} />
+      <input ref={input} type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv" hidden onChange={(e) => void pick(e.target.files?.[0])} />
       <button type="button" className="btn btn-ghost" onClick={() => input.current?.click()}>Choose class list…</button>
 
       {parsed && (
