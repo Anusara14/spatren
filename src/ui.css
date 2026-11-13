@@ -366,3 +366,4 @@ input, textarea, select { -webkit-user-select: text; user-select: text; }
 .record-row:hover, .record-row:focus-visible { background: var(--surface-2); outline: none; }
 .asked-list { margin: 6px 0 0; padding-left: 16px; display: grid; gap: 4px; }
 .record-sheet { max-height: 88vh; overflow-y: auto; }
+.chip-private { margin-left: 8px; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; background: color-mix(in srgb, var(--lime, #bed43d) 22%, transparent); white-space: nowrap; }

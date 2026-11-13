@@ -10,7 +10,7 @@ import { IconClose } from './icons'
 type AnswerValue = string | number | boolean | string[] | { lat: number; lng: number; accuracy?: number } | null
 
 /** Question labels for a survey's answers, from the forms cached on this phone. */
-function questionLabels(formId: unknown): Record<string, { label: string; type: string }> {
+export function questionLabels(formId: unknown): Record<string, { label: string; type: string }> {
   try {
     const forms = JSON.parse(localStorage.getItem('spatren.forms') ?? '[]') as { id: string; definition: FormDef }[]
     const local = JSON.parse(localStorage.getItem('spatren.localForms') ?? '[]') as { id: string; definition: FormDef }[]

@@ -2,7 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { batchMatch } from '../lib/batch'
 import { clock, groupColor } from '../lib/geo'
 import { nameOf, supabase, type RecordRow, type SosRow, type TeamRow } from '../lib/supabase'
+import { ratingOf } from '../lib/experience'
+import { buildKml, type KmlPlace } from '../lib/kml'
 import { csvCell, download } from './export'
+import { questionLabels } from './RecordSheet'
 import WordCloud from './WordCloud'
 
 interface Activity {
@@ -35,6 +38,7 @@ export default function Summary({ isAdmin = true }: { isAdmin?: boolean }) {
   const [sos, setSos] = useState<SosRow[]>([])
   const [photos, setPhotos] = useState<{ url: string; rec: RecordRow }[]>([])
   const [loading, setLoading] = useState(true)
+  const [kmlMsg, setKmlMsg] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -125,6 +129,48 @@ export default function Summary({ isAdmin = true }: { isAdmin?: boolean }) {
         }),
     }
     download(`spatren-records-${day}.geojson`, JSON.stringify(fc), 'application/geo+json')
+  }
+
+  /** Every located record (all days) with its photos, for Google My Maps → Import, or Google Earth. */
+  async function exportKml() {
+    setKmlMsg('Preparing the map…')
+    try {
+      const all: RecordRow[] = []
+      for (let page = 0; ; page++) {
+        const { data, error } = await supabase.from('records').select('*').not('lat', 'is', null).order('recorded_at').range(page * 1000, page * 1000 + 999)
+        if (error) throw new Error(error.message)
+        all.push(...((data ?? []) as RecordRow[]))
+        if (!data || data.length < 1000) break
+      }
+      // The owner can read every batch; keep the map to this batch's people.
+      const recs = isAdmin && userGroup.size ? all.filter((r) => userGroup.has(r.user_id)) : all
+      const paths = recs.flatMap((r) => r.media.filter((m) => m.type.startsWith('image') && !m.path.startsWith('device://')).map((m) => m.path))
+      const urls = new Map<string, string>()
+      for (let i = 0; i < paths.length; i += 100) {
+        // ponytail: links valid for a year; re-export if the field map is needed after that
+        const { data } = await supabase.storage.from('media').createSignedUrls(paths.slice(i, i + 100), 365 * 24 * 3600)
+        for (const d of data ?? []) if (d.signedUrl && d.path) urls.set(d.path, d.signedUrl)
+      }
+      const places: KmlPlace[] = recs.map((r) => {
+        const who = userGroup.get(r.user_id)
+        const labels = questionLabels(r.data?.form_id)
+        const answers = Object.entries((r.data?.answers ?? {}) as Record<string, unknown>)
+          .filter(([q, v]) => (typeof v === 'string' || typeof v === 'number' || Array.isArray(v)) && !['photo', 'audio'].includes(labels[q]?.type ?? '') && !/^(device:|https?:)/.test(String(v)))
+          .map(([q, v]): [string, string] => [labels[q]?.label ?? q, Array.isArray(v) ? v.join(', ') : String(v)])
+        return {
+          id: r.id, kind: r.kind, category: r.category, notes: r.notes, lat: r.lat!, lng: r.lng!, recorded_at: r.recorded_at,
+          name: r.title || (r.kind === 'survey' ? String(r.data?.form_title ?? 'Survey') : r.category || r.kind),
+          by: who ? nameOf(who) : null, group: who?.grp ?? null, index_no: who?.index_no ?? null,
+          rating: ratingOf(r.data?.rating as number | undefined)?.label ?? null, answers,
+          photos: r.media.flatMap((m) => (urls.has(m.path) ? [urls.get(m.path)!] : [])),
+        }
+      })
+      if (!places.length) return setKmlMsg('No uploaded records with a location yet.')
+      download(`spatren-map-${localDay()}.kml`, buildKml(places, `SPATREN field map ${localDay()}`), 'application/vnd.google-earth.kml+xml')
+      setKmlMsg(`${places.length} places, ${urls.size} photos. In Google My Maps: Add layer → Import → choose this file.`)
+    } catch (e) {
+      setKmlMsg(`Couldn't make the map: ${e instanceof Error ? e.message : 'error'}.`)
+    }
   }
 
   async function exportTracks() {
@@ -226,12 +272,14 @@ export default function Summary({ isAdmin = true }: { isAdmin?: boolean }) {
 
       <section className="card stack">
         <h2 style={{ fontSize: 17 }}>Export</h2>
-        <p className="small muted">GeoJSON opens directly in QGIS. CSV opens in Excel (UTF-8, Sinhala/Tamil safe).</p>
+        <p className="small muted">KML goes into Google My Maps (Add layer → Import) or Google Earth, each place with its photos. GeoJSON opens directly in QGIS. CSV opens in Excel (UTF-8, Sinhala/Tamil safe).</p>
         <div className="row" style={{ flexWrap: 'wrap' }}>
           <button className="btn btn-primary btn-sm" onClick={exportCsv} disabled={!records.length}>Records CSV</button>
           <button className="btn btn-lime btn-sm" onClick={exportGeoJson} disabled={!records.length}>Records GeoJSON</button>
+          <button className="btn btn-primary btn-sm" onClick={() => void exportKml()}>Map with photos (KML, all days)</button>
           {isAdmin && <button className="btn btn-ghost btn-sm" onClick={() => void exportTracks()}>GPS tracks CSV</button>}
         </div>
+        {kmlMsg && <p className="small" role="status">{kmlMsg}</p>}
       </section>
     </div>
   )
