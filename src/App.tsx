@@ -1,5 +1,6 @@
 import type { Session } from '@supabase/supabase-js'
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
+import { autoRestoreAndBackup, installAutoBackup } from './lib/backup'
 import { requestPersistence } from './lib/db'
 import { supabase, type Profile } from './lib/supabase'
 import { syncNow } from './lib/sync'
@@ -17,10 +18,12 @@ const Admin = lazy(() => import('./ui/Admin'))
 const Collect = lazy(() => import('./ui/Collect'))
 const Summary = lazy(() => import('./ui/Summary'))
 const FormRunner = lazy(() => import('./ui/FormRunner'))
+const BackupPreview = lazy(() => import('./ui/BackupSection'))
 const loadSample = () => import('./lib/forms').then((m) => m.SAMPLE_FORM)
 
 type Tab = 'field' | 'collect' | 'summary' | 'admin'
 const PROFILE_CACHE = 'spatren.profile'
+installAutoBackup()
 
 function cachedProfile(): Profile | null {
   try {
@@ -57,6 +60,7 @@ export default function App() {
   useEffect(() => {
     if (profile?.status !== 'approved') return
     void requestPersistence()
+    void autoRestoreAndBackup()
     void syncNow()
     if (wasTracking()) void startTracking() // resume after a reload or app switch
     const retry = setInterval(() => void syncNow(), 30_000) // records + SOS retry even with Field Mode off
@@ -116,6 +120,7 @@ function DevPreview() {
   const h = location.hash
   if (h === '#collect-preview') return <div className="main"><Collect isAdmin /></div>
   if (h === '#admin-preview') return <div className="main"><Admin profile={fake} /></div>
+  if (h === '#backup-preview') return <div className="main"><Suspense fallback={null}><BackupPreview /></Suspense></div>
   if (h === '#summary-preview') return <div className="main"><Summary isAdmin={false} /></div>
   if (h === '#runner-preview') return <RunnerPreview />
   return <Field profile={fake} onRecord={() => undefined} onProfileChange={() => undefined} />

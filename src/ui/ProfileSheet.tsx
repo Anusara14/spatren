@@ -6,6 +6,7 @@ import { oauthRedirect, openOAuth } from '../lib/native'
 import { avatarUrl, nameOf, supabase, type Profile } from '../lib/supabase'
 import { stopTracking } from '../lib/tracking'
 import { IconClose, IconGoogle, IconSync } from './icons'
+import BackupSection from './BackupSection'
 import Credits from './Credits'
 import { ThemeToggle } from './Theme'
 
@@ -107,6 +108,8 @@ export default function ProfileSheet({ profile, onClose, onChanged }: Props) {
             </button>
           )}
         </section>
+
+        <BackupSection />
 
         <AiKeySection />
 
